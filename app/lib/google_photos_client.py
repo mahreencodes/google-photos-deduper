@@ -88,5 +88,44 @@ class GooglePhotosClient(GoogleApiClient):
 
         self.logger.info(f"Done fetching mediaItems, {item_count:,} total")
 
+    def _chunked(self, iterable, n):
+        """Yield successive n-sized chunks from iterable."""
+        from itertools import islice
+
+        it = iter(iterable)
+        while True:
+            chunk = list(islice(it, n))
+            if not chunk:
+                break
+            yield chunk
+
+    def get_media_items_by_ids(self, ids: list[str]) -> dict:
+        """
+        Fetch media items by their IDs using the batchGet endpoint.
+        Returns dict mapping mediaItemId -> mediaItem dict.
+        """
+        results: dict = {}
+        # Use a conservative chunk size (50)
+        for chunk in self._chunked(ids, 50):
+            body = {"mediaItemIds": chunk}
+
+            def func():
+                return self.session.post(
+                    "https://photoslibrary.googleapis.com/v1/mediaItems:batchGet",
+                    json=body,
+                ).json()
+
+            resp_json = self._refresh_credentials_if_invalid(func)
+
+            for entry in resp_json.get("mediaItemResults", []):
+                media_item = entry.get("mediaItem")
+                if media_item:
+                    results[media_item["id"]] = media_item
+                else:
+                    status = entry.get("status")
+                    self.logger.warning("batchGet returned no mediaItem for entry: %s", status)
+
+        return results
+
     def get_local_media_items(self):
         return self.repo.all()

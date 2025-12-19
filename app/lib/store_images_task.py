@@ -29,6 +29,33 @@ class StoreImagesTask:
     def run(self):
         media_item_id_map = self.repo.get_id_map(self.media_item_ids)
 
+        # If any media items are missing from the local repo, attempt to fetch
+        # them using the Photos API batchGet endpoint before storing images.
+        missing_ids = [mid for mid in self.media_item_ids if mid not in media_item_id_map]
+        if missing_ids:
+            try:
+                # Import here to avoid circular imports at module load
+                from app.lib.google_photos_client import GooglePhotosClient
+
+                client = GooglePhotosClient.from_user_id(self.user_id, logger=self.logger)
+                fetched_map = client.get_media_items_by_ids(missing_ids)
+                for mid, media_item in fetched_map.items():
+                    self.repo.create_or_update(
+                        media_item
+                        | {
+                            "fetchedAt": __import__("datetime").datetime.now().astimezone(),
+                            "deletedAt": None,
+                        }
+                    )
+                # Rebuild id map to include newly fetched items
+                media_item_id_map = self.repo.get_id_map(self.media_item_ids)
+            except ValueError as e:
+                self.logger.error("No credentials for user %s: %s", self.user_id, e)
+                raise
+            except Exception as e:
+                self.logger.error("Error fetching missing media items for user %s: %s", self.user_id, e)
+                raise
+
         num_completed = 0
         num_total = len(self.media_item_ids)
         last_log_time = time.time()
