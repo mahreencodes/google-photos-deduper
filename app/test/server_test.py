@@ -41,3 +41,29 @@ class TestAuthMe:
             assert response.status_code == 200
             assert response.json["logged_in"] is True
             assert response.json["user_info"] == user_info
+
+    def test_get_active_task_results_for_insufficient_scopes(self, client, mocker):
+        # Setup a fake AsyncResult with SUCCESS status and an error payload
+        fake_result = Mock()
+        fake_result.status = "SUCCESS"
+        fake_result.info = {"error": "insufficient_scopes", "user_id": "user-1"}
+
+        mocker.patch("app.server.tasks.process_duplicates.AsyncResult", return_value=fake_result)
+
+        with client.session_transaction() as session:
+            session["active_task_id"] = "fake"
+
+        response = client.get("/api/active_task/results")
+        assert response.status_code == 200
+        assert response.json["error"] == "insufficient_scopes"
+
+    def test_get_credentials(self, client, mocker, credentials, user_id):
+        mocker.patch("app.server.CredentialsRepository", return_value=Mock(get=Mock(return_value=credentials)))
+
+        with client.session_transaction() as session:
+            session["user_id"] = user_id
+
+        response = client.get("/api/credentials")
+        assert response.status_code == 200
+        assert response.json["has_credentials"] is True
+        assert "scopes" in response.json

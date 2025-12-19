@@ -17,8 +17,26 @@ export default function TaskResultsPage() {
       {isLoading ? (
         <CircularProgress size={"2rem"} sx={{ mt: 2 }} />
       ) : (
-        activeTask?.status === "SUCCESS" &&
-        results && <TaskResults results={results!} />
+        <>
+          {results && (results as any).error ? (
+            // If backend returned an error payload (e.g., insufficient scopes), show re-auth prompt
+            <Alert severity="error" sx={{ mt: 2 }}>
+              <AlertTitle>Action required</AlertTitle>
+              {(results as any).error === "insufficient_scopes" ? (
+                <>
+                  Insufficient authentication scopes. Please{" "}
+                  <a href="/auth/google">re-authorize</a> the app to grant the
+                  required permissions.
+                </>
+              ) : (
+                (results as any).error
+              )}
+            </Alert>
+          ) : (
+            activeTask?.status === "SUCCESS" &&
+            results && <TaskResults results={results!} />
+          )}
+        </>
       )}
     </>
   );

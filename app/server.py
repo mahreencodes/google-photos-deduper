@@ -128,11 +128,30 @@ def get_active_task_results():
     result = tasks.process_duplicates.AsyncResult(active_task_id)
     response = {}
     if result.status == "SUCCESS":
-        # If the task has completed successfully, return results
+        # If the task completed but returned an error payload, forward it.
+        if isinstance(result.info, dict) and "error" in result.info:
+            # return the error payload directly so the UI can act (e.g., re-auth)
+            return flask.jsonify(result.info)
+
+        # Otherwise, assume normal results structure and format for display
         results = task_results_for_display(result.info["results"])
         response |= results
 
     return flask.jsonify(response)
+
+
+@flask_app.route("/api/credentials", methods=["GET"])
+def get_credentials():
+    user_id = flask.session.get("user_id")
+    if not user_id:
+        return flask.jsonify({"error": "not_logged_in"}), 401
+
+    credentials_repo = server.CredentialsRepository(user_id)
+    creds = credentials_repo.get()
+    if not creds:
+        return flask.jsonify({"has_credentials": False, "scopes": None})
+
+    return flask.jsonify({"has_credentials": True, "scopes": creds.get("scopes")})
 
 
 @flask_app.route("/api/media_items/<id>", methods=["POST"])
