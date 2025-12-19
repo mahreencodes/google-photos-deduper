@@ -20,6 +20,9 @@ interface FormData {
   refresh_media_items: boolean;
   resolution: string;
   similarity_threshold: string;
+  download_original: boolean;
+  image_store_path: string;
+  chunk_size: string;
 }
 
 export default function TaskOptionsPage() {
@@ -37,6 +40,9 @@ export default function TaskOptionsPage() {
       refresh_media_items: true,
       resolution: "250",
       similarity_threshold: "99.00",
+      download_original: false,
+      image_store_path: "",
+      chunk_size: "",
     },
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,6 +61,9 @@ export default function TaskOptionsPage() {
         ...data,
         resolution: parseInt(data.resolution),
         similarity_threshold: parseFloat(data.similarity_threshold) / 100.0,
+        download_original: data.download_original,
+        image_store_path: data.image_store_path || undefined,
+        chunk_size: data.chunk_size ? parseInt(data.chunk_size) : undefined,
       }),
     });
 
@@ -133,6 +142,70 @@ export default function TaskOptionsPage() {
                   : "Default: 250px"}
               </FormHelperText>
             </FormControl>
+
+            <Box sx={{ mt: 2 }}>
+              <Controller
+                name="download_original"
+                control={control}
+                render={({ field }) => (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={field.value}
+                        onChange={(e) => field.onChange(e.target.checked)}
+                      />
+                    }
+                    label="Download originals for comparison"
+                  />
+                )}
+              />
+
+              <Controller
+                name="image_store_path"
+                control={control}
+                render={({ field }) => (
+                  <FormControl variant="standard" sx={{ mt: 1 }}>
+                    <Input
+                      id="image_store_path"
+                      placeholder="/path/to/images"
+                      sx={{ width: 320 }}
+                      {...field}
+                    />
+                    <FormHelperText>
+                      Optional: directory to store images (absolute or relative
+                      path)
+                    </FormHelperText>
+                  </FormControl>
+                )}
+              />
+
+              <Controller
+                name="chunk_size"
+                control={control}
+                rules={{
+                  validate: (v) => {
+                    if (!v) return true;
+                    const n = parseInt(v);
+                    return n > 0 || "Please enter a number > 0";
+                  },
+                }}
+                render={({ field }) => (
+                  <FormControl variant="standard" sx={{ mt: 1 }}>
+                    <Input
+                      id="chunk_size"
+                      sx={{ width: 120 }}
+                      endAdornment={
+                        <InputAdornment position="end">items</InputAdornment>
+                      }
+                      {...field}
+                    />
+                    <FormHelperText>
+                      Optional: break work into chunks to limit disk usage
+                    </FormHelperText>
+                  </FormControl>
+                )}
+              />
+            </Box>
           </Box>
         )}
         <Box>

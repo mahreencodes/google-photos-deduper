@@ -11,6 +11,8 @@ export default function CredentialsDiagnostics() {
   const [data, setData] = useState<null | {
     has_credentials: boolean;
     scopes: string[] | null;
+    required_scopes?: string[] | null;
+    missing_scopes?: string[] | null;
   }>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,24 +58,42 @@ export default function CredentialsDiagnostics() {
               <a href="/auth/google">sign in / re-authorize</a>.
             </Alert>
           ) : (
-            <Alert severity="info">
-              <AlertTitle>Stored credentials</AlertTitle>
-              <div>
-                <strong>Scopes:</strong>
-                <ul>
-                  {data.scopes && data.scopes.length > 0 ? (
-                    data.scopes.map((s) => <li key={s}>{s}</li>)
-                  ) : (
-                    <li>None listed</li>
-                  )}
-                </ul>
-                <div>
-                  If scopes are missing, please{" "}
-                  <a href="/auth/google?prompt=consent">re-authorize</a> the app
+            <>
+              {data.missing_scopes && data.missing_scopes.length > 0 && (
+                <Alert severity="warning" sx={{ mb: 1 }}>
+                  <AlertTitle>Missing required scopes</AlertTitle>
+                  The stored credentials are missing the following required
+                  scopes:
+                  <ul>
+                    {data.missing_scopes.map((s) => (
+                      <li key={s}>{s}</li>
+                    ))}
+                  </ul>
+                  Please <a href="/auth/google?prompt=consent">re-authorize</a>{" "}
                   to grant the required permissions.
+                </Alert>
+              )}
+
+              <Alert severity="info">
+                <AlertTitle>Stored credentials</AlertTitle>
+                <div>
+                  <strong>Scopes:</strong>
+                  <ul>
+                    {data.scopes && data.scopes.length > 0 ? (
+                      data.scopes.map((s) => <li key={s}>{s}</li>)
+                    ) : (
+                      <li>None listed</li>
+                    )}
+                  </ul>
+
+                  <div>
+                    If scopes are missing, please{" "}
+                    <a href="/auth/google?prompt=consent">re-authorize</a> the
+                    app to grant the required permissions.
+                  </div>
                 </div>
-              </div>
-            </Alert>
+              </Alert>
+            </>
           )}
         </Box>
       )}

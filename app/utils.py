@@ -46,6 +46,23 @@ def refresh_session_credentials_if_invalid(
     )
 
 
+# Scopes requested during OAuth consent. Exported so other modules (server/UI) can
+# inspect required scopes and surface proactive warnings if stored credentials
+# do not include them.
+REQUIRED_SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/userinfo.email",
+    # Request a superset of photo scopes to avoid oauthlib scope-change
+    # errors where Google may return previously-granted scopes. Including
+    # the standard readonly scope along with the app-created-data scopes
+    # prevents a 'Scope has changed' token parsing exception.
+    "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata",
+    "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata",
+    "https://www.googleapis.com/auth/photoslibrary.readonly",
+]
+
+
 def __get_oauth_flow(state: str = None) -> google_auth_oauthlib.flow.Flow:
     flow = google_auth_oauthlib.flow.Flow.from_client_config(
         {
@@ -56,15 +73,7 @@ def __get_oauth_flow(state: str = None) -> google_auth_oauthlib.flow.Flow:
                 "token_uri": config.GOOGLE_TOKEN_URI,
             }
         },
-        scopes=[
-            "openid",
-            "https://www.googleapis.com/auth/userinfo.profile",
-            "https://www.googleapis.com/auth/userinfo.email",
-            # Use the least-privileged Photos API scope required to list media items.
-            # If you later need to write or modify media, switch to the broader
-            # "https://www.googleapis.com/auth/photoslibrary" scope.
-            "https://www.googleapis.com/auth/photoslibrary.readonly",
-        ],
+        scopes=REQUIRED_SCOPES,
         state=state,
     )
 

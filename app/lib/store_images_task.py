@@ -12,11 +12,17 @@ class StoreImagesTask:
         user_id: str,
         media_item_ids: list[str],
         resolution: Optional[int] = None,
+        download_original: bool = False,
+        image_store_path: Optional[str] = None,
+        chunk_size: Optional[int] = None,
         logger: logging.Logger = logging,
     ):
         self.user_id = user_id
         self.media_item_ids = media_item_ids
         self.resolution = resolution
+        self.download_original = download_original
+        self.image_store_path = image_store_path
+        self.chunk_size = chunk_size
         self.logger = logger
 
         self.repo = MediaItemsRepository(user_id=user_id)
@@ -24,6 +30,10 @@ class StoreImagesTask:
         image_store_args = {}
         if resolution:
             image_store_args["resolution"] = resolution
+        if image_store_path:
+            image_store_args["base_path"] = image_store_path
+        if download_original:
+            image_store_args["download_original"] = True
         self.image_store = MediaItemsImageStore(**image_store_args)
 
     def run(self):

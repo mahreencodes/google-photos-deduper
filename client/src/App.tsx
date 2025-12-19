@@ -14,15 +14,16 @@ import {
   LinkProps as RouterLinkProps,
 } from "react-router-dom";
 import Link, { LinkProps } from "@mui/material/Link";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
+import { ThemeProvider } from "@mui/material/styles";
 import { useFetch } from "utils/useFetch";
 import { appApiUrl, fetchAppJson } from "utils";
 import { MeResponseType } from "utils/types";
 import { AppContext, AppContextType, ActiveTaskType } from "utils/AppContext";
 import DeduperAppBar from "components/DeduperAppBar";
-import DeduperDrawer from "components/DeduperDrawer";
 import Box from "@mui/material/Box";
 import TaskResultsPage from "components/pages/TaskResultsPage";
+import VideoBackground from "components/VideoBackground";
+import { createAppTheme } from "./theme";
 
 export default function App() {
   const { data: me, isLoading: meIsLoading } = useFetch<MeResponseType>(
@@ -37,6 +38,7 @@ export default function App() {
     );
     setActiveTask(activeTaskJson);
   };
+
   useEffect(() => {
     reloadActiveTask();
   }, []);
@@ -52,17 +54,26 @@ export default function App() {
     reloadActiveTask: reloadActiveTask,
   };
 
+  const theme = createAppTheme("dark");
+
   return (
     <AppContext.Provider value={appState}>
-      <CssBaseline />
       <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <VideoBackground />
         <Router>
-          <Box sx={{ display: "flex" }}>
+          <Box sx={{ position: "relative", zIndex: 1 }}>
             <DeduperAppBar />
-            <DeduperDrawer />
             <Box
               component="main"
-              sx={{ minHeight: "100vh", flexGrow: 1, px: 2, pt: 10 }}
+              sx={{
+                minHeight: "100vh",
+                maxWidth: 1400,
+                mx: "auto",
+                px: { xs: 2, sm: 3, md: 4 },
+                pt: { xs: 8, sm: 10 },
+                pb: 3,
+              }}
             >
               <Routes>
                 <Route path="/" element={<Layout />}>
@@ -85,7 +96,7 @@ export default function App() {
                   <Route
                     path="/active_task"
                     element={
-                      <Page title="Process Duplicates">
+                      <Page title="">
                         <ActiveTaskPage />
                       </Page>
                     }
@@ -137,17 +148,4 @@ const LinkBehavior = React.forwardRef<
   return <RouterLink ref={ref} to={href} {...other} />;
 });
 
-const theme = createTheme({
-  components: {
-    MuiLink: {
-      defaultProps: {
-        component: LinkBehavior,
-      } as LinkProps,
-    },
-    MuiButtonBase: {
-      defaultProps: {
-        LinkComponent: LinkBehavior,
-      },
-    },
-  },
-});
+// Link behavior for routing

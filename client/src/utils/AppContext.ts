@@ -6,6 +6,9 @@ export interface ActiveTaskType {
   meta?: {
     logMessage?: string;
     error?: string;
+    currentOperation?: string;
+    itemsProcessed?: number;
+    totalItems?: number;
     steps?: {
       [step: string]: {
         startedAt: string;

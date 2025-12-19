@@ -1,5 +1,5 @@
 import "./TaskResults.css";
-import { ChangeEvent, useContext } from "react";
+import { ChangeEvent, useContext, useMemo } from "react";
 import { TaskResultsContext } from "utils/TaskResultsContext";
 import TaskResultsActionBar from "components/TaskResultsActionBar";
 import Box from "@mui/material/Box";
@@ -13,6 +13,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Radio from "@mui/material/Radio";
+import Grid from "@mui/material/Grid";
 import { css } from "@emotion/react";
 import { truncateString } from "utils";
 import AspectRatioIcon from "@mui/icons-material/AspectRatio";
@@ -70,6 +71,28 @@ export default function TaskResults(props: TaskResultsProps) {
     new Set<string>()
   );
 
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const totalGroups = groupsWithDuplicates.length;
+    const selectedGroups = groupsWithDuplicates.filter((g) => g.isSelected).length;
+    const totalDuplicates = groupsWithDuplicates.reduce(
+      (sum, g) => sum + g.mediaItemIds.length - 1,
+      0
+    );
+    const selectedDuplicates = selectedMediaItemIds.size;
+    const deletedCount = Object.values(results.mediaItems).filter(
+      (m) => m.deletedAt
+    ).length;
+
+    return {
+      totalGroups,
+      selectedGroups,
+      totalDuplicates,
+      selectedDuplicates,
+      deletedCount,
+    };
+  }, [groupsWithDuplicates, selectedMediaItemIds, results.mediaItems]);
+
   return (
     <TaskResultsContext.Provider
       value={{
@@ -79,6 +102,80 @@ export default function TaskResults(props: TaskResultsProps) {
       }}
     >
       <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+        {/* Statistics Summary */}
+        <Box sx={{ mb: 3 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={6} sm={3}>
+              <Card
+                sx={{
+                  p: 2,
+                  background: "linear-gradient(135deg, #4285F4 0%, #1A73E8 100%)",
+                  color: "white",
+                  borderRadius: 2,
+                }}
+              >
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                  Duplicate Groups
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  {stats.totalGroups}
+                </Typography>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Card
+                sx={{
+                  p: 2,
+                  background: "linear-gradient(135deg, #EA4335 0%, #c62828 100%)",
+                  color: "white",
+                  borderRadius: 2,
+                }}
+              >
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                  Total Duplicates
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  {stats.totalDuplicates}
+                </Typography>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Card
+                sx={{
+                  p: 2,
+                  background: "linear-gradient(135deg, #FBBC04 0%, #F9AB00 100%)",
+                  color: "white",
+                  borderRadius: 2,
+                }}
+              >
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                  Selected
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  {stats.selectedDuplicates}
+                </Typography>
+              </Card>
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <Card
+                sx={{
+                  p: 2,
+                  background: "linear-gradient(135deg, #34A853 0%, #2e7d32 100%)",
+                  color: "white",
+                  borderRadius: 2,
+                }}
+              >
+                <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                  Deleted
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  {stats.deletedCount}
+                </Typography>
+              </Card>
+            </Grid>
+          </Grid>
+        </Box>
+
         <Box className="select-all-container">
           <SelectAll />
         </Box>
@@ -100,7 +197,7 @@ export default function TaskResults(props: TaskResultsProps) {
                   height={height}
                   width={width}
                   itemCount={groupsWithDuplicates.length}
-                  itemSize={263}
+                  itemSize={280}
                 >
                   {({ index, style }) => (
                     <ResultRow
@@ -191,6 +288,12 @@ function MediaItemCard({
   const isOriginal = mediaItem.id === group.originalMediaItemId;
   const originalMediaItem = results.mediaItems[group.originalMediaItemId];
 
+  const similarity =
+    results.similarityMap[mediaItem.id]?.[originalMediaItem.id];
+  const similarityPercent = similarity
+    ? `${(similarity * 100).toFixed(1)}%`
+    : "N/A";
+
   const cardClasses = [
     "media-item-card",
     isOriginal ? "selected" : "",
@@ -203,12 +306,32 @@ function MediaItemCard({
     <Card
       className={cardClasses}
       sx={{
-        width: 240,
+        width: 220,
         opacity: mediaItem.deletedAt ? 0.6 : 1,
         transition: "all 0.2s ease",
+        position: "relative",
       }}
       key={mediaItem.id}
     >
+      {isOriginal && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            background: "linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)",
+            color: "white",
+            px: 1,
+            py: 0.5,
+            borderRadius: 1,
+            fontSize: "0.7rem",
+            fontWeight: 600,
+            zIndex: 1,
+          }}
+        >
+          ORIGINAL
+        </Box>
+      )}
       <CardActionArea
         href={mediaItem.productUrl}
         target="_blank"
@@ -216,48 +339,87 @@ function MediaItemCard({
       >
         <CardMedia
           component="img"
-          height="100"
+          height="160"
           image={mediaItem.imageUrl}
           alt={mediaItem.filename}
+          sx={{ objectFit: "cover" }}
         />
       </CardActionArea>
-      <CardContent sx={{ pb: 0 }}>
-        <Stack spacing={1}>
-          <MediaItemCardField
-            field="similarity"
-            {...{ mediaItem, isOriginal, originalMediaItem }}
-          />
-          <MediaItemCardField
-            field="filename"
-            {...{ mediaItem, isOriginal, originalMediaItem }}
-          />
-          <MediaItemCardField
-            field="dimensions"
-            {...{ mediaItem, isOriginal, originalMediaItem }}
-          />
-          {mediaItem.error && (
-            <MediaItemCardField
-              field="error"
-              {...{ mediaItem, isOriginal, originalMediaItem }}
-            />
-          )}
-          {mediaItem.deletedAt ? (
-            <MediaItemCardField
-              field="deletedAt"
-              {...{ mediaItem, isOriginal, originalMediaItem }}
-            />
-          ) : (
-            group.isSelected && (
-              <Typography variant="body2">
-                <FormControlLabel
-                  value={mediaItem.id}
-                  control={<Radio size="small" disableRipple sx={{ py: 0 }} />}
-                  label="Original"
-                  checked={isOriginal}
-                  onChange={handleSelectedOriginalChange}
-                  disableTypography={true}
-                />
+      <CardContent sx={{ pb: 1, pt: 1.5 }}>
+        <Stack spacing={0.5}>
+          {!isOriginal && similarity && (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+                mb: 0.5,
+              }}
+            >
+              <CompareIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+              <Typography
+                variant="caption"
+                sx={{
+                  fontWeight: 600,
+                  color:
+                    similarity > 0.99
+                      ? "success.main"
+                      : similarity > 0.95
+                      ? "warning.main"
+                      : "error.main",
+                }}
+              >
+                {similarityPercent} similar
               </Typography>
+            </Box>
+          )}
+          <Tooltip title={mediaItem.filename} arrow>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: isOriginal ? 600 : 400,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontSize: "0.8rem",
+              }}
+            >
+              {truncateString(mediaItem.filename, 20)}
+            </Typography>
+          </Tooltip>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontSize: "0.7rem" }}
+          >
+            {mediaItem.dimensions}
+          </Typography>
+          {mediaItem.deletedAt ? (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+                color: "success.main",
+                mt: 0.5,
+              }}
+            >
+              <CheckCircleIcon sx={{ fontSize: 14 }} />
+              <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                Deleted
+              </Typography>
+            </Box>
+          ) : (
+            group.isSelected &&
+            !isOriginal && (
+              <FormControlLabel
+                value={mediaItem.id}
+                control={<Radio size="small" disableRipple sx={{ py: 0 }} />}
+                label="Set as original"
+                checked={false}
+                onChange={handleSelectedOriginalChange}
+                sx={{ mt: 0.5 }}
+              />
             )
           )}
         </Stack>

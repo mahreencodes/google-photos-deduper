@@ -50,21 +50,28 @@ export default function DeduperAppBar() {
             sx={{
               display: "inline-flex",
               alignItems: "center",
+              gap: 1.5,
             }}
           >
             <img
-              src="/logo.svg"
-              alt="logo"
-              style={{ width: 30, height: 30, marginRight: 16 }}
+              src="/Google_Photos_icon_(2020-2025).svg"
+              width="30"
+              height="30"
+              alt="Google Photos Logo"
             />
-            Google Photos Deduper
+            <Box
+              component="span"
+              sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+            >
+              <Box component="span">Deduper</Box>
+            </Box>
           </Link>
         </Box>
 
         {isLoggedIn && (
-          <Box sx={{ alignItems: "right" }}>
+          <>
             <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-              <Avatar alt={user.name} src={user.picture} />
+              <Avatar alt={user?.name || ""} src={user?.picture} />
             </IconButton>
             <Menu
               sx={{ mt: "45px" }}
@@ -86,7 +93,7 @@ export default function DeduperAppBar() {
                 <Typography textAlign="center">Logout</Typography>
               </MenuItem>
             </Menu>
-          </Box>
+          </>
         )}
       </Toolbar>
     </AppBar>

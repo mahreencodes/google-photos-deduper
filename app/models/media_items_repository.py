@@ -30,6 +30,11 @@ class MediaItemsRepository:
 
     @classmethod
     def create_indexes(cls):
+        # If DATABASE is not configured (e.g., in tests), skip creating indexes.
+        if not getattr(config, "DATABASE", None):
+            logging.info("Skipping index creation because DATABASE is not configured")
+            return
+
         instance = cls("1")
         instance._create_indexes()
 

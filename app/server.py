@@ -39,8 +39,15 @@ def auth():
 
 @flask_app.route("/auth/google/callback")
 def callback():
-    state = flask.session["state"]
-    credentials = utils.get_credentials(state, flask.request.url)
+    state = flask.session.get("state")
+
+    try:
+        credentials = utils.get_credentials(state, flask.request.url)
+    except ValueError as e:
+        # OAuth token exchange failed (possibly due to scope changes); surface a
+        # user-friendly message rather than letting the debugger intercept.
+        flask_app.logger.error("Failed to exchange token during callback: %s", e)
+        return flask.jsonify({"error": "token_exchange_failed", "message": str(e)}), 400
 
     client = GoogleApiClient(credentials)
     client.save_credentials()
@@ -58,12 +65,42 @@ def create_task():
     task_args = {
         "refresh_media_items": flask.request.json.get("refresh_media_items"),
     }
+
     if "resolution" in flask.request.json:
         task_args["resolution"] = int(flask.request.json.get("resolution"))
     if "similarity_threshold" in flask.request.json:
         task_args["similarity_threshold"] = float(
             flask.request.json.get("similarity_threshold")
         )
+
+    # New options: download_original, image_store_path, chunk_size
+    if "download_original" in flask.request.json:
+        task_args["download_original"] = bool(flask.request.json.get("download_original"))
+    if "image_store_path" in flask.request.json:
+        image_store_path = flask.request.json.get("image_store_path")
+        # Normalize path and attempt to create directory if it doesn't exist
+        try:
+            import os
+
+            image_store_path = os.path.abspath(os.path.expanduser(image_store_path))
+            os.makedirs(image_store_path, exist_ok=True)
+            if not os.access(image_store_path, os.W_OK):
+                return flask.jsonify({"error": "image_store_path_not_writable"}), 400
+        except Exception as e:
+            flask_app.logger.error("Invalid image_store_path provided: %s", e)
+            return flask.jsonify({"error": "invalid_image_store_path", "message": str(e)}), 400
+
+        task_args["image_store_path"] = image_store_path
+
+    if "chunk_size" in flask.request.json:
+        try:
+            chunk_size = int(flask.request.json.get("chunk_size"))
+            if chunk_size <= 0:
+                raise ValueError("chunk_size must be > 0")
+            task_args["chunk_size"] = chunk_size
+        except Exception as e:
+            return flask.jsonify({"error": "invalid_chunk_size", "message": str(e)}), 400
+
     flask_app.logger.info(
         f"Creating task for user_id {user_id} with options: {task_args}"
     )
@@ -146,12 +183,29 @@ def get_credentials():
     if not user_id:
         return flask.jsonify({"error": "not_logged_in"}), 401
 
-    credentials_repo = server.CredentialsRepository(user_id)
+    # Import here to avoid circular import at module load
+    from app.models.credentials_repository import CredentialsRepository
+
+    credentials_repo = CredentialsRepository(user_id)
     creds = credentials_repo.get()
     if not creds:
-        return flask.jsonify({"has_credentials": False, "scopes": None})
+        return flask.jsonify({
+            "has_credentials": False,
+            "scopes": None,
+            "required_scopes": utils.REQUIRED_SCOPES,
+            "missing_scopes": utils.REQUIRED_SCOPES,
+        })
 
-    return flask.jsonify({"has_credentials": True, "scopes": creds.get("scopes")})
+    stored_scopes = creds.get("scopes") or []
+    # Compute which of the required scopes are not present in the stored token
+    missing = [s for s in utils.REQUIRED_SCOPES if s not in stored_scopes]
+
+    return flask.jsonify({
+        "has_credentials": True,
+        "scopes": stored_scopes,
+        "required_scopes": utils.REQUIRED_SCOPES,
+        "missing_scopes": missing,
+    })
 
 
 @flask_app.route("/api/media_items/<id>", methods=["POST"])
@@ -169,6 +223,37 @@ def update_media_item(id):
 def logout():
     flask.session.clear()
     return flask.jsonify(success=True)
+
+
+@flask_app.route("/api/recent_media_items", methods=["GET"])
+def get_recent_media_items():
+    user_id = flask.session.get("user_id")
+    if not user_id:
+        return flask.jsonify({"error": "not_logged_in"}), 401
+
+    limit = int(flask.request.args.get("limit", 20))
+    repo = MediaItemsRepository(user_id=user_id)
+    
+    # Get recent media items sorted by fetchedAt descending
+    recent_items = list(
+        repo.collection.find(
+            {"userId": user_id, "storageFilename": {"$exists": True}},
+            sort=[("fetchedAt", -1)],
+            limit=limit
+        )
+    )
+    
+    # Format for display
+    items_for_display = []
+    for item in recent_items:
+        try:
+            display_item = media_item_for_display(item)
+            items_for_display.append(display_item)
+        except Exception as e:
+            flask_app.logger.warning(f"Error formatting media item {item.get('id')}: {e}")
+            continue
+    
+    return flask.jsonify({"items": items_for_display, "count": len(items_for_display)})
 
 
 def task_results_for_display(results):

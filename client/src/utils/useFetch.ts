@@ -13,7 +13,7 @@ type Action<T> =
   | { type: "error"; payload: Error };
 
 export function useFetch<T = unknown>(
-  url: string,
+  url: string | null | undefined,
   options?: RequestInit
 ): State<T> {
   // Used to prevent state update if the component is unmounted
@@ -48,6 +48,11 @@ export function useFetch<T = unknown>(
   const [state, dispatch] = useReducer(fetchReducer, initialState);
 
   useEffect(() => {
+    // Skip fetch if URL is empty or undefined
+    if (!url || url === "") {
+      return;
+    }
+
     cancelRequest.current = false;
 
     const fetchData = async () => {

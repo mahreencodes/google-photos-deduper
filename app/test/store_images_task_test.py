@@ -30,3 +30,37 @@ def test_store_images_fetches_missing_items(mocker, media_item):
     assert repo_instance.create_or_update.called
     # Ensure update was called to set storageFilename
     assert repo_instance.update.called
+
+
+def test_store_images_respects_custom_path_and_original_flag(mocker, tmp_path, media_item):
+    user_id = "user-1"
+    media_id = media_item["id"]
+
+    # Mock repository to return the existing media item
+    repo_cls = mocker.patch("app.lib.store_images_task.MediaItemsRepository")
+    repo_instance = repo_cls.return_value
+    repo_instance.get_id_map.return_value = {media_id: media_item}
+
+    # Prevent actual downloading of images
+    img_store_cls = mocker.patch("app.lib.store_images_task.MediaItemsImageStore")
+    img_store = img_store_cls.return_value
+    img_store.store_image.return_value = f"{media_id}-original.jpg"
+
+    custom_path = str(tmp_path / "images")
+
+    task = StoreImagesTask(
+        user_id,
+        [media_id],
+        resolution=100,
+        download_original=True,
+        image_store_path=custom_path,
+        logger=Mock(),
+    )
+
+    task.run()
+
+    # repo.update should be called with storageFilename that indicates original
+    repo_instance.update.assert_called()
+    args = repo_instance.update.call_args[0]
+    assert "storageFilename" in args[1]
+    assert args[1]["storageFilename"].endswith("-original.jpg")

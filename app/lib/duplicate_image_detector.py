@@ -124,9 +124,17 @@ class DuplicateImageDetector:
         with ImageEmbedder.create_from_options(options) as embedder:
             # Process images in batches to optimize memory usage
             batch_size = 32  # Process 32 images at a time
-            for batch_start in trange(0, len(self.media_items), batch_size, ascii=False):
+            total_batches = (len(self.media_items) + batch_size - 1) // batch_size
+            for batch_idx, batch_start in enumerate(trange(0, len(self.media_items), batch_size, ascii=False)):
                 batch_end = min(batch_start + batch_size, len(self.media_items))
                 batch_items = self.media_items[batch_start:batch_end]
+                
+                # Log progress every batch
+                if batch_idx % 5 == 0 or batch_idx == total_batches - 1:
+                    self.logger.info(
+                        f"Computing embeddings: batch {batch_idx + 1}/{total_batches} "
+                        f"({batch_start + len(batch_items)}/{len(self.media_items)} images)"
+                    )
                 
                 for media_item in batch_items:
                     storage_path = self._get_storage_path(media_item)

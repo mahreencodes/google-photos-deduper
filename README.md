@@ -50,14 +50,21 @@ While a [hosted web app](https://github.com/mtalcott/google-photos-deduper/wiki#
     - Developer contact information: Enter your email
     - Save and Continue
   - Add or remove scopes:
-    - Manually add scopes:
+    - Manually add scopes (the app requests these scopes at OAuth consent):
+
       - `https://www.googleapis.com/auth/userinfo.profile`
       - `https://www.googleapis.com/auth/userinfo.email`
-      - `https://www.googleapis.com/auth/photoslibrary.readonly` # Least-privilege scope to read media items
+      - `https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata` — edit photos, videos, and albums created by this app
+      - `https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata` — read app-created media
+
+      (Note: the app also includes `https://www.googleapis.com/auth/photoslibrary.readonly` during the OAuth flow to avoid oauthlib parsing issues when scopes change.)
+
     - Update
     - Save and Continue
 
 > Tip: If you run into a 403 "insufficient authentication scopes" error, ask the user to re-authorize the app (OAuth consent) so their token is granted the required scopes. You can force a fresh consent with `prompt=consent` when generating the authorization URL.
+
+> The server exposes a `/api/credentials` endpoint that returns `required_scopes` and any `missing_scopes` for the stored credentials; the UI surfaces these via the **Credentials Diagnostics** panel to help users re-authorize with the correct scopes.
 
 - Test users:
   - Add your email (and any others you want to use the tool with)
@@ -99,6 +106,11 @@ If you have questions about the tool, please [post on the discussions page](http
   - Utilizes [Vite](https://vitejs.dev/) for HMR and building.
 - Chrome extension
   - Utilizes the [CRXJS Vite Plugin](https://crxjs.dev/vite-plugin) for HMR and building.
+
+## Docs
+
+- Dedup workflow and architecture: `docs/DEDUP-WORKFLOW.md` (explains chunking, embeddings, grouping, and storage options)
+- Development & testing notes (heavy dependencies and running tests): `docs/DEVELOPMENT.md`
 
 ## Motivation
 

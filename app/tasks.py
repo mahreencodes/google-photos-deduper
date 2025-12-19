@@ -46,7 +46,7 @@ task_logger.addHandler(task_updater_log_handler)
 #     we can pass along progress from the tdqm progress bars from
 #     sentence_transformers and our DuplicateImageDetector.
 #     """
-#     print(f"setup_stdout_handler, kwargs: {kwargs}")
+
 #     # Update celery task meta with logs from redirected output (e.g. print statements)
 #     logging.getLogger("celery.redirected").addHandler(task_updater_log_handler)
 
@@ -124,6 +124,9 @@ def store_images(
     user_id: str,
     media_item_ids: list[str],
     resolution: Optional[int] = None,
+    download_original: bool = False,
+    image_store_path: Optional[str] = None,
+    chunk_size: Optional[int] = None,
 ):
     # TODO: Fix this workaround
     task_updater_log_handler.set_handler(lambda x: None)
@@ -131,6 +134,9 @@ def store_images(
         user_id,
         media_item_ids,
         resolution,
+        download_original=download_original,
+        image_store_path=image_store_path,
+        chunk_size=chunk_size,
         logger=task_logger,
     )
     task_instance.run()

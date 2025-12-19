@@ -76,7 +76,7 @@ class ProcessDuplicatesTask:
         self.logger = logger
 
         # Initialize meta structure
-        self.meta = {"logMessage": None}
+        self.meta = {"logMessage": None, "currentOperation": None, "itemsProcessed": 0, "totalItems": 0}
         self.meta["steps"] = {
             step: {"startedAt": None, "completedAt": None} for step in Steps.all
         }
@@ -121,7 +121,9 @@ class ProcessDuplicatesTask:
             raise
 
         media_items_count = client.local_media_items_count()
+        self.meta["totalItems"] = media_items_count
         self.complete_step(Steps.FETCH_MEDIA_ITEMS, count=media_items_count)
+        self.update_meta(log_message=f"Fetched {media_items_count} media items. Starting duplicate detection...")
         self.start_step(Steps.PROCESS_DUPLICATES)
 
         # Determine default chunk size if not set
@@ -227,8 +229,16 @@ class ProcessDuplicatesTask:
 
             # Store images and set storageFilename on media items
             stored_chunk = []
-            for m in chunk:
+            for idx, m in enumerate(chunk):
                 try:
+                    if idx % 10 == 0:  # Update every 10 images
+                        processed = self.meta.get("itemsProcessed", 0) + idx
+                        self.update_meta(
+                            log_message=f"Downloading images: chunk {chunk_index + 1}/{total_chunks}, "
+                                       f"{idx + 1}/{len(chunk)} images ({processed}/{self.meta.get('totalItems', 0)} total)",
+                            current_operation=f"Downloading images (chunk {chunk_index + 1}/{total_chunks})",
+                            items_processed=processed
+                        )
                     filename = image_store.store_image(m)
                     # Clone media item dict so we don't mutate original
                     mi = dict(m)
@@ -237,11 +247,20 @@ class ProcessDuplicatesTask:
                 except Exception as e:
                     self.logger.warning("Failed to store image for media_item %s: %s", m.get("id"), e)
                     continue
+            
+            # Update items processed after chunk download
+            new_processed = self.meta.get("itemsProcessed", 0) + len(stored_chunk)
+            self.update_meta(items_processed=new_processed)
 
             if len(stored_chunk) == 0:
                 continue
 
             # Compute embeddings for this chunk
+            self.update_meta(
+                log_message=f"Computing embeddings: chunk {chunk_index + 1}/{total_chunks} "
+                           f"({len(stored_chunk)} images)",
+                current_operation=f"Computing embeddings (chunk {chunk_index + 1}/{total_chunks})"
+            )
             detector = DuplicateImageDetector(stored_chunk, logger=self.logger, threshold=self.similarity_threshold, image_store=image_store)
             detector._calculate_embeddings()
 
@@ -297,7 +316,8 @@ class ProcessDuplicatesTask:
                     f"Comparing chunks {i} vs {j} ({comparison_count}/{total_comparisons}, {progress_pct}%)"
                 )
                 self.update_meta(
-                    log_message=f"Comparing chunks: {comparison_count}/{total_comparisons} ({progress_pct}%)"
+                    log_message=f"Comparing chunks: {comparison_count}/{total_comparisons} ({progress_pct}%)",
+                    current_operation=f"Comparing image similarities ({progress_pct}%)"
                 )
                 
                 ids_j = json.load(open(ids_j_path))
@@ -391,12 +411,21 @@ class ProcessDuplicatesTask:
         start_step_name=None,
         complete_step_name=None,
         count=None,
+        current_operation=None,
+        items_processed=None,
+        total_items=None,
     ):
         """
         Update local meta, then call celery method to update task state.
         """
         if log_message:
             self.meta["logMessage"] = log_message
+        if current_operation is not None:
+            self.meta["currentOperation"] = current_operation
+        if items_processed is not None:
+            self.meta["itemsProcessed"] = items_processed
+        if total_items is not None:
+            self.meta["totalItems"] = total_items
 
         now = datetime.datetime.now().astimezone().isoformat()
         if start_step_name:

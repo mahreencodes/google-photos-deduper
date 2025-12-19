@@ -1,5 +1,6 @@
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -32,7 +33,7 @@
 }
 
 .progress-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
   border-radius: 16px;
   padding: 24px;
   margin: 16px 0;
@@ -43,7 +44,7 @@
 }
 
 .progress-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: -100%;
@@ -90,7 +91,7 @@
   border-radius: 8px;
   padding: 12px;
   margin-top: 16px;
-  font-family: 'Monaco', 'Menlo', monospace;
+  font-family: "Monaco", "Menlo", monospace;
   font-size: 0.875rem;
   white-space: pre-wrap;
   word-break: break-word;
@@ -154,3 +155,17 @@
   padding: 40px;
 }
 
+@keyframes numberCountUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.metric-value {
+  animation: numberCountUp 0.6s ease-out;
+}
