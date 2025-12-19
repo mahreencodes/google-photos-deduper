@@ -79,10 +79,19 @@ export default function TaskResults(props: TaskResultsProps) {
       }}
     >
       <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
-        <SelectAll />
+        <Box className="select-all-container">
+          <SelectAll />
+        </Box>
         <Box sx={{ flexGrow: 1 }}>
           {groupsWithDuplicates.length === 0 ? (
-            <Typography sx={{ mt: 4 }}>No duplicates found. 🎉</Typography>
+            <Box className="no-duplicates-message">
+              <Typography variant="h2" component="h2">
+                🎉 No Duplicates Found!
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
+                Your Google Photos library is clean and organized.
+              </Typography>
+            </Box>
           ) : (
             <AutoSizer>
               {({ height, width }) => (
@@ -138,29 +147,31 @@ function ResultRow({ group, style }: ResultRowProps) {
   };
 
   return (
-    <Stack direction="row" spacing={2} sx={{ py: 2 }} style={style}>
-      <Box css={styles.valignMiddle}>
-        {group.hasDuplicates ? (
-          <Checkbox
-            checked={group.isSelected}
-            name="groupSelected"
-            onChange={handleGroupCheckboxChange}
+    <Box className="duplicate-group" style={style}>
+      <Stack direction="row" spacing={2} sx={{ py: 2 }}>
+        <Box css={styles.valignMiddle}>
+          {group.hasDuplicates ? (
+            <Checkbox
+              checked={group.isSelected}
+              name="groupSelected"
+              onChange={handleGroupCheckboxChange}
+            />
+          ) : (
+            <Checkbox disabled sx={{ opacity: 0 }} />
+          )}
+        </Box>
+        {group.mediaItemIds.map((mediaItemId) => (
+          <MediaItemCard
+            key={mediaItemId}
+            {...{
+              group,
+              mediaItemId,
+              handleSelectedOriginalChange,
+            }}
           />
-        ) : (
-          <Checkbox disabled sx={{ opacity: 0 }} />
-        )}
-      </Box>
-      {group.mediaItemIds.map((mediaItemId) => (
-        <MediaItemCard
-          key={mediaItemId}
-          {...{
-            group,
-            mediaItemId,
-            handleSelectedOriginalChange,
-          }}
-        />
-      ))}
-    </Stack>
+        ))}
+      </Stack>
+    </Box>
   );
 }
 
@@ -180,11 +191,21 @@ function MediaItemCard({
   const isOriginal = mediaItem.id === group.originalMediaItemId;
   const originalMediaItem = results.mediaItems[group.originalMediaItemId];
 
+  const cardClasses = [
+    "media-item-card",
+    isOriginal ? "selected" : "",
+    mediaItem.deletedAt ? "deleted" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <Card
+      className={cardClasses}
       sx={{
         width: 240,
         opacity: mediaItem.deletedAt ? 0.6 : 1,
+        transition: "all 0.2s ease",
       }}
       key={mediaItem.id}
     >
@@ -281,6 +302,10 @@ function MediaItemCardField({
         similarityAsPercent = `${(similarity * 100).toFixed(2)}%`;
         if (similarity > 0.99) {
           color = "success.main";
+        } else if (similarity > 0.95) {
+          color = "warning.main";
+        } else {
+          color = "error.main";
         }
       }
       text = `Similarity: ${similarityAsPercent}`;

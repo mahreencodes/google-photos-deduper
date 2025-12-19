@@ -2,7 +2,8 @@ import copy
 import datetime
 import logging
 import time
-from typing import Literal
+import os
+from typing import Literal, Optional
 import celery.result
 import requests
 import app.config
@@ -10,8 +11,8 @@ from app.lib.duplicate_image_detector import DuplicateImageDetector
 from app.lib.google_photos_client import GooglePhotosClient
 from app import CELERY_APP as celery_app
 from app.models.media_items_repository import MediaItemsRepository
+from app.lib.media_items_image_store import MediaItemsImageStore
 from enum import Enum
-import app.tasks
 
 
 class Steps:
@@ -59,6 +60,9 @@ class ProcessDuplicatesTask:
         refresh_media_items: bool = False,
         resolution: int = 250,
         similarity_threshold: float = 0.99,
+        download_original: bool = False,
+        image_store_path: Optional[str] = None,
+        chunk_size: Optional[int] = None,
         logger: logging.Logger = logging,
     ):
         self.task = task
@@ -66,6 +70,9 @@ class ProcessDuplicatesTask:
         self.refresh_media_items = refresh_media_items
         self.resolution = resolution
         self.similarity_threshold = similarity_threshold
+        self.download_original = download_original
+        self.image_store_path = image_store_path
+        self.chunk_size = chunk_size
         self.logger = logger
 
         # Initialize meta structure
@@ -117,6 +124,11 @@ class ProcessDuplicatesTask:
         self.complete_step(Steps.FETCH_MEDIA_ITEMS, count=media_items_count)
         self.start_step(Steps.PROCESS_DUPLICATES)
 
+        # Determine default chunk size if not set
+        if not self.chunk_size:
+            # Default to 500 items per chunk for reasonable memory usage
+            self.chunk_size = app.config.CHUNK_SIZE_DEFAULT if hasattr(app.config, "CHUNK_SIZE_DEFAULT") else 500
+
         self.logger.info(
             f"Processing duplicates for {media_items_count:,} media items..."
         )
@@ -124,16 +136,24 @@ class ProcessDuplicatesTask:
         media_items = list(client.get_local_media_items())
 
         # Skip videos for now. We don't get video length from metadata and size
-        #   is not a good enough indicator of similarity;
-        media_items = list(filter(lambda m: "photo" in m["mediaMetadata"], media_items))
+        #   is not a good enough indicator of similarity; treat items as photos
+        #   unless they explicitly contain 'video' metadata.
+        media_items = list(filter(lambda m: "video" not in m.get("mediaMetadata", {}), media_items))
 
-        duplicate_detector = DuplicateImageDetector(
-            media_items,
-            logger=self.logger,
-            threshold=self.similarity_threshold,
-        )
-        similarity_map = duplicate_detector.calculate_similarity_map()
-        groups = duplicate_detector.calculate_groups()
+        # If a chunk_size is provided, process embeddings in chunks to avoid
+        # storing the entire library at once. Otherwise, use the existing
+        # embedding flow.
+        if self.chunk_size:
+            similarity_map = self._chunked_similarity_map(media_items)
+            groups = self._groups_from_similarity_map(similarity_map, media_items)
+        else:
+            duplicate_detector = DuplicateImageDetector(
+                media_items,
+                logger=self.logger,
+                threshold=self.similarity_threshold,
+            )
+            similarity_map = duplicate_detector.calculate_similarity_map()
+            groups = duplicate_detector.calculate_groups()
 
         result = {
             "similarityMap": similarity_map,
@@ -164,6 +184,203 @@ class ProcessDuplicatesTask:
         self.complete_step(Steps.PROCESS_DUPLICATES, count=len(result["groups"]))
 
         return result
+
+    def _chunked_similarity_map(self, media_items: list[dict]) -> dict:
+        """Compute similarity map by processing images in chunks and comparing
+        embeddings across chunk pairs to limit memory usage."""
+        import numpy as np
+        import json
+        import shutil
+
+        task_id = getattr(self.task, "request", None)
+        task_id = getattr(task_id, "id", None) or str(time.time_ns())
+        embeddings_dir = os.path.join(app.config.TEMP_PATH, f"embeddings-{task_id}")
+        os.makedirs(embeddings_dir, exist_ok=True)
+
+        chunk_paths = []  # list of (chunk_index, ids_path, emb_path)
+        total_chunks = (len(media_items) + self.chunk_size - 1) // self.chunk_size
+
+        # Partition media_items into chunks
+        for idx in range(0, len(media_items), self.chunk_size):
+            chunk = media_items[idx : idx + self.chunk_size]
+            chunk_index = idx // self.chunk_size
+            
+            self.logger.info(
+                f"Processing chunk {chunk_index + 1}/{total_chunks} "
+                f"({len(chunk)} items)"
+            )
+            self.update_meta(
+                log_message=f"Processing chunk {chunk_index + 1}/{total_chunks} "
+                           f"({len(chunk)} items)"
+            )
+
+            # Create a temporary directory for this chunk's images
+            images_dir = os.path.join(embeddings_dir, f"chunk-{chunk_index}-images")
+            os.makedirs(images_dir, exist_ok=True)
+
+            # Use MediaItemsImageStore to store images to images_dir
+            image_store = MediaItemsImageStore(
+                resolution=self.resolution,
+                base_path=images_dir,
+                download_original=self.download_original,
+            )
+
+            # Store images and set storageFilename on media items
+            stored_chunk = []
+            for m in chunk:
+                try:
+                    filename = image_store.store_image(m)
+                    # Clone media item dict so we don't mutate original
+                    mi = dict(m)
+                    mi["storageFilename"] = filename
+                    stored_chunk.append(mi)
+                except Exception as e:
+                    self.logger.warning("Failed to store image for media_item %s: %s", m.get("id"), e)
+                    continue
+
+            if len(stored_chunk) == 0:
+                continue
+
+            # Compute embeddings for this chunk
+            detector = DuplicateImageDetector(stored_chunk, logger=self.logger, threshold=self.similarity_threshold, image_store=image_store)
+            detector._calculate_embeddings()
+
+            # Save embeddings to disk as numpy for later pairwise comparison
+            emb_np = detector.embeddings.numpy()
+            emb_path = os.path.join(embeddings_dir, f"chunk-{chunk_index}-embeddings.npy")
+            np.save(emb_path, emb_np)
+
+            # Save media ids mapping
+            ids_path = os.path.join(embeddings_dir, f"chunk-{chunk_index}-ids.json")
+            with open(ids_path, "w") as f:
+                json.dump([m["id"] for m in stored_chunk], f)
+
+            # Optionally delete images to save disk (we keep embeddings)
+            try:
+                shutil.rmtree(images_dir)
+            except Exception:
+                pass
+
+            chunk_paths.append((chunk_index, ids_path, emb_path))
+
+        # Now compute pairwise similarities across chunk pairs
+        from collections import defaultdict
+
+        similarity_map = defaultdict(dict)
+        total_comparisons = len(chunk_paths) * (len(chunk_paths) + 1) // 2
+        comparison_count = 0
+        
+        self.logger.info(
+            f"Computing pairwise similarities across {len(chunk_paths)} chunks "
+            f"({total_comparisons} comparisons)"
+        )
+        self.update_meta(
+            log_message=f"Computing similarities: {len(chunk_paths)} chunks, "
+                       f"{total_comparisons} comparisons"
+        )
+
+        for i, ids_i_path, emb_i_path in chunk_paths:
+            ids_i = json.load(open(ids_i_path))
+            # Use memory mapping for large embeddings to reduce memory usage
+            emb_i = np.load(emb_i_path, mmap_mode='r')
+            # Normalize emb_i (create a copy for normalization to avoid modifying mmap)
+            emb_i_norm = emb_i / np.linalg.norm(emb_i, axis=1, keepdims=True)
+
+            for j, ids_j_path, emb_j_path in chunk_paths:
+                # Only compute j >= i to avoid duplicating work
+                if j < i:
+                    continue
+                
+                comparison_count += 1
+                progress_pct = int((comparison_count / total_comparisons) * 100)
+                self.logger.info(
+                    f"Comparing chunks {i} vs {j} ({comparison_count}/{total_comparisons}, {progress_pct}%)"
+                )
+                self.update_meta(
+                    log_message=f"Comparing chunks: {comparison_count}/{total_comparisons} ({progress_pct}%)"
+                )
+                
+                ids_j = json.load(open(ids_j_path))
+                # Use memory mapping for large embeddings
+                emb_j = np.load(emb_j_path, mmap_mode='r')
+                emb_j_norm = emb_j / np.linalg.norm(emb_j, axis=1, keepdims=True)
+
+                # Vectorized cosine similarity computation
+                scores = emb_i_norm @ emb_j_norm.T
+
+                # Use vectorized operations to find pairs above threshold
+                # This is much faster than nested loops
+                above_threshold = scores >= self.similarity_threshold
+                
+                # Get indices where similarity is above threshold
+                a_indices, b_indices = np.where(above_threshold)
+                
+                # Filter out self-comparisons in same chunk
+                if i == j:
+                    mask = a_indices != b_indices
+                    a_indices = a_indices[mask]
+                    b_indices = b_indices[mask]
+                
+                # Add pairs to similarity map
+                for a_ind, b_ind in zip(a_indices, b_indices):
+                    id_a = ids_i[a_ind]
+                    id_b = ids_j[b_ind]
+                    score = float(scores[a_ind, b_ind])
+                    similarity_map[id_a][id_b] = score
+                    similarity_map[id_b][id_a] = score
+
+        # Cleanup embeddings if desired
+        try:
+            shutil.rmtree(embeddings_dir)
+        except Exception:
+            pass
+
+        return dict(similarity_map)
+
+    def _groups_from_similarity_map(self, similarity_map: dict, media_items: list[dict]) -> list:
+        """Generate groups (connected components) from the similarity map.
+
+        Returns a list of groups where each group is a list of indices into `media_items`.
+        This keeps the output consistent with `DuplicateImageDetector.calculate_groups`.
+        """
+        # Union-Find (Disjoint Set) to build connected components
+        parent = {}
+
+        def find(x):
+            parent.setdefault(x, x)
+            if parent[x] != x:
+                parent[x] = find(parent[x])
+            return parent[x]
+
+        def union(a, b):
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[rb] = ra
+
+        # Map media ids to indices
+        media_id_to_index = {m["id"]: idx for idx, m in enumerate(media_items)}
+
+        for a, neigh in similarity_map.items():
+            if a not in media_id_to_index:
+                continue
+            for b in neigh.keys():
+                if b not in media_id_to_index:
+                    continue
+                union(media_id_to_index[a], media_id_to_index[b])
+
+        groups_map = {}
+        for node in parent.keys():
+            root = find(node)
+            groups_map.setdefault(root, []).append(node)
+
+        # Filter groups with at least 2 members and return lists of indices
+        groups = []
+        for group_indices in groups_map.values():
+            if len(group_indices) < 2:
+                continue
+            groups.append(sorted(group_indices))
+
+        return groups
 
     # Celery's `update_state` method overwrites the `info`/`meta` field.
     #   Store our own local meta so we don't have to read it from Redis for
@@ -225,12 +442,26 @@ class ProcessDuplicatesTask:
         if len(media_item_ids) == 0:
             return
 
-        store_images_result = app.tasks.store_images.delay(
-            self.user_id,
-            media_item_ids,
-            self.resolution,
-        )
-        self.subtasks.append(Subtask(Subtask.Type.STORE_IMAGES, store_images_result))
+        # When chunked processing is enabled, we'll not schedule the usual
+        # store_images subtasks for the full dataset upfront. Chunked
+        # processing stores images per-chunk in temporary directories.
+        if self.chunk_size:
+            # Just record fetched ids; chunked stage will handle storing
+            # and processing later.
+            self.subtasks.append(Subtask(Subtask.Type.STORE_IMAGES, None))
+        else:
+            import app.tasks
+            store_images_result = app.tasks.store_images.delay(
+                self.user_id,
+                media_item_ids,
+                self.resolution,
+                download_original=self.download_original,
+                image_store_path=self.image_store_path,
+                chunk_size=self.chunk_size,
+            )
+            self.subtasks.append(Subtask(Subtask.Type.STORE_IMAGES, store_images_result))
+
+        self.fetched_media_item_ids = []
 
         self.fetched_media_item_ids = []
 
@@ -238,6 +469,11 @@ class ProcessDuplicatesTask:
         """
         Wait for all subtasks to complete.
         """
+        # If chunked processing is enabled, we don't create actual store image
+        # subtasks for the whole dataset; skip waiting in that case.
+        if self.chunk_size:
+            return
+
         while True:
             subtask_classes = {s.type.name for s in self.subtasks}
             subtask_results = [s.result for s in self.subtasks]

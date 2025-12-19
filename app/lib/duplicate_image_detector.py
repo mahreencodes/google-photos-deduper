@@ -5,18 +5,16 @@ import time
 import numpy as np
 
 import requests
-import torch
 from tqdm import trange
-import mediapipe as mp
+
+from typing import Optional
 
 from app.lib.media_items_image_store import MediaItemsImageStore
 from app import config
 
-BaseOptions = mp.tasks.BaseOptions
-ImageEmbedder = mp.tasks.vision.ImageEmbedder
-ImageEmbedderOptions = mp.tasks.vision.ImageEmbedderOptions
-ImageEmbedderResult = mp.tasks.vision.ImageEmbedderResult
-VisionRunningMode = mp.tasks.vision.RunningMode
+# Heavy dependencies (torch, mediapipe) are imported lazily inside
+# `_calculate_embeddings` so unit tests and other parts of the code can
+# import this module without requiring the full ML stack at import time.
 
 
 class DuplicateImageDetector:
@@ -32,12 +30,15 @@ class DuplicateImageDetector:
         media_items: list[dict],
         threshold: float = 0.99,
         logger=logging.getLogger(),
+        image_store: Optional[MediaItemsImageStore] = None,
     ):
         self.media_items = media_items
         self.threshold = threshold
         self.logger = logger
-        self.image_store = MediaItemsImageStore()
-        self.embeddings: torch.Tensor = None
+        self.image_store = image_store or MediaItemsImageStore()
+        # Embeddings will be a torch.Tensor when computed; keep untyped to avoid
+        # requiring torch at module import time in test environments.
+        self.embeddings = None
 
     def calculate_groups(self):
         embeddings = self._calculate_embeddings()
@@ -89,7 +90,7 @@ class DuplicateImageDetector:
 
         model_path = os.path.join(config.TEMP_PATH, "mobilenet_v3_large.tflite")
         if not os.path.exists(model_path):
-            print(f"Downloading model")
+            self.logger.info("Downloading mediapipe model to %s", model_path)
             request = requests.get(
                 self.MODEL_URL,
                 timeout=20,
@@ -97,9 +98,22 @@ class DuplicateImageDetector:
             with open(model_path, "wb") as file:
                 file.write(request.content)
 
-        print(f"Calculating embeddings for {len(self.media_items)} images")
+        self.logger.info("Calculating embeddings for %d images", len(self.media_items))
         start = time.perf_counter()
         embeddings = []
+
+        try:
+            import mediapipe as mp
+        except ImportError as error:
+            raise RuntimeError(
+                "mediapipe is required to calculate embeddings. "
+                "Install it with `pip install mediapipe`"
+            ) from error
+
+        BaseOptions = mp.tasks.BaseOptions
+        ImageEmbedder = mp.tasks.vision.ImageEmbedder
+        ImageEmbedderOptions = mp.tasks.vision.ImageEmbedderOptions
+        VisionRunningMode = mp.tasks.vision.RunningMode
 
         options = ImageEmbedderOptions(
             base_options=BaseOptions(model_asset_path=model_path),
@@ -108,26 +122,41 @@ class DuplicateImageDetector:
         )
 
         with ImageEmbedder.create_from_options(options) as embedder:
-            for i in trange(len(self.media_items), ascii=False):
-                media_item = self.media_items[i]
-                storage_path = self._get_storage_path(media_item)
+            # Process images in batches to optimize memory usage
+            batch_size = 32  # Process 32 images at a time
+            for batch_start in trange(0, len(self.media_items), batch_size, ascii=False):
+                batch_end = min(batch_start + batch_size, len(self.media_items))
+                batch_items = self.media_items[batch_start:batch_end]
+                
+                for media_item in batch_items:
+                    storage_path = self._get_storage_path(media_item)
 
-                mp_image = None
-                try:
-                    mp_image = mp.Image.create_from_file(storage_path)
-                except RuntimeError as error:
-                    logging.warning(
-                        f"Skipping invalid image file:\n"
-                        f"error: {error}\n"
-                        f"media_item: {media_item}\n"
-                    )
-                    continue
-                embedding_result = embedder.embed(mp_image)
-                embeddings.append(embedding_result.embeddings[0].embedding)
+                    mp_image = None
+                    try:
+                        mp_image = mp.Image.create_from_file(storage_path)
+                    except RuntimeError as error:
+                        logging.warning(
+                            f"Skipping invalid image file:\n"
+                            f"error: {error}\n"
+                            f"media_item: {media_item}\n"
+                        )
+                        continue
+                    embedding_result = embedder.embed(mp_image)
+                    embeddings.append(embedding_result.embeddings[0].embedding)
+                    
+                    # Explicitly delete mp_image to free memory immediately
+                    del mp_image
 
         self.logger.info(
             f"Calculated embeddings in {(time.perf_counter() - start):.2f} seconds"
         )
+
+        try:
+            import torch
+        except ImportError as error:
+            raise RuntimeError(
+                "torch is required to calculate embeddings. Install it with `pip install torch`"
+            ) from error
 
         self.embeddings = torch.tensor(np.array(embeddings))
         return self.embeddings
@@ -135,7 +164,7 @@ class DuplicateImageDetector:
     # From https://github.com/UKPLab/sentence-transformers/blob/a458ce79c40fef93d5ecc66931b446ea65fdd017/sentence_transformers/util.py#L346
     def _community_detection(
         self,
-        embeddings: torch.Tensor,
+        embeddings,
         threshold=0.99,
         min_community_size=2,
         batch_size=128,
@@ -146,6 +175,13 @@ class DuplicateImageDetector:
         Returns only communities that are larger than min_community_size. The communities are returned
         in decreasing order. The first element in each list is the central point in the community.
         """
+        try:
+            import torch
+        except ImportError as error:
+            raise RuntimeError(
+                "torch is required for community detection. Install it with `pip install torch`"
+            ) from error
+
         threshold = torch.tensor(threshold, device=embeddings.device)
 
         extracted_communities = []
@@ -218,18 +254,25 @@ class DuplicateImageDetector:
 
         return unique_communities
 
-    def _cos_sim(self, a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    def _cos_sim(self, a, b):
         """
         Computes the cosine similarity cos_sim(a[i], b[j]) for all i and j.
         Assumes tensors have already been l2-normalized.
         :return: Matrix with res[i][j]  = cos_sim(a[i], b[j])
         """
+        try:
+            import torch
+        except ImportError as error:
+            raise RuntimeError(
+                "torch is required to compute cosine similarities. Install it with `pip install torch`"
+            ) from error
+
         return torch.mm(a, b.transpose(0, 1))
 
     # From https://github.com/UKPLab/sentence-transformers/blob/a458ce79c40fef93d5ecc66931b446ea65fdd017/sentence_transformers/util.py#L136
     def _paraphrase_mining_embeddings(
         self,
-        embeddings: torch.Tensor,
+        embeddings,
         query_chunk_size: int = 500,
         corpus_chunk_size: int = 10000,
         max_pairs: int = 500000,
@@ -262,6 +305,13 @@ class DuplicateImageDetector:
                     embeddings[corpus_start_idx : corpus_start_idx + corpus_chunk_size],
                 )
 
+                try:
+                    import torch
+                except ImportError as error:
+                    raise RuntimeError(
+                        "torch is required to perform similarity mining. Install it with `pip install torch`"
+                    ) from error
+
                 scores_top_k_values, scores_top_k_idx = torch.topk(
                     scores,
                     min(top_k, len(scores[0])),
@@ -288,20 +338,20 @@ class DuplicateImageDetector:
                                 entry = pairs.get()
                                 min_score = entry[0]
 
-            # Get the pairs
-            added_pairs = set()  # Used for duplicate detection
-            pairs_list = []
-            while not pairs.empty():
-                score, i, j = pairs.get()
-                sorted_i, sorted_j = sorted([i, j])
+        # Get the pairs (moved outside loops to collect all pairs)
+        added_pairs = set()  # Used for duplicate detection
+        pairs_list = []
+        while not pairs.empty():
+            score, i, j = pairs.get()
+            sorted_i, sorted_j = sorted([i, j])
 
-                if sorted_i != sorted_j and (sorted_i, sorted_j) not in added_pairs:
-                    added_pairs.add((sorted_i, sorted_j))
-                    pairs_list.append([score, i, j])
+            if sorted_i != sorted_j and (sorted_i, sorted_j) not in added_pairs:
+                added_pairs.add((sorted_i, sorted_j))
+                pairs_list.append([score, i, j])
 
-            # Highest scores first
-            pairs_list = sorted(pairs_list, key=lambda x: x[0], reverse=True)
-            return pairs_list
+        # Highest scores first
+        pairs_list = sorted(pairs_list, key=lambda x: x[0], reverse=True)
+        return pairs_list
 
     def _get_storage_path(self, media_item) -> str:
         return self.image_store.get_storage_path(media_item["storageFilename"])
