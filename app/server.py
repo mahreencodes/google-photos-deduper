@@ -405,6 +405,152 @@ def extension_get_status():
     })
 
 
+@flask_app.route("/api/picker/token", methods=["GET"])
+def picker_get_token():
+    """
+    Get access token for Google Photos Picker API.
+    """
+    user_id = flask.session.get("user_id")
+    if not user_id:
+        return flask.jsonify({"error": "not_logged_in"}), 401
+    
+    try:
+        client = GoogleApiClient.from_user_id(user_id)
+        access_token = client.credentials_obj.token
+        
+        return flask.jsonify({
+            "accessToken": access_token,
+            "success": True
+        })
+    except Exception as e:
+        flask_app.logger.error(f"Error getting picker token: {e}")
+        return flask.jsonify({"error": "token_error", "message": str(e)}), 400
+
+
+@flask_app.route("/api/picker/photos", methods=["POST"])
+def picker_receive_photos():
+    """
+    Receive photo metadata from Google Photos Picker API.
+    """
+    user_id = flask.session.get("user_id")
+    if not user_id:
+        return flask.jsonify({"error": "not_logged_in"}), 401
+    
+    data = flask.request.json
+    photos = data.get("photos", [])
+    batch_number = data.get("batch_number", 1)
+    total_batches = data.get("total_batches", 1)
+    is_final = data.get("is_final", False)
+    
+    flask_app.logger.info(
+        f"Received batch {batch_number}/{total_batches} with {len(photos)} photos from picker"
+    )
+    
+    # Store photos in temporary collection for processing
+    repo = MediaItemsRepository(user_id=user_id)
+    
+    # Store each photo with picker source flag
+    for photo in photos:
+        photo_data = {
+            "userId": user_id,
+            "id": photo.get("id"),
+            "filename": photo.get("name"),
+            "baseUrl": photo.get("url"),
+            "mimeType": photo.get("mimeType"),
+            "mediaMetadata": {
+                "width": "0",  # Picker doesn't provide dimensions
+                "height": "0",
+            },
+            "pickerSource": True,  # Flag to indicate source
+            "batchNumber": batch_number,
+        }
+        
+        # Upsert to avoid duplicates
+        repo.collection.update_one(
+            {"userId": user_id, "id": photo.get("id")},
+            {"$set": photo_data},
+            upsert=True
+        )
+    
+    # Return progress
+    total_stored = repo.collection.count_documents(
+        {"userId": user_id, "pickerSource": True}
+    )
+    
+    return flask.jsonify({
+        "success": True,
+        "received": len(photos),
+        "total_stored": total_stored,
+        "batch_number": batch_number,
+        "is_final": is_final
+    })
+
+
+@flask_app.route("/api/picker/analyze", methods=["POST"])
+def picker_trigger_analysis():
+    """
+    Trigger duplicate analysis on photos selected via Picker API.
+    """
+    user_id = flask.session.get("user_id")
+    if not user_id:
+        return flask.jsonify({"error": "not_logged_in"}), 401
+    
+    # Get analysis options from request
+    resolution = int(flask.request.json.get("resolution", 224))
+    similarity_threshold = float(flask.request.json.get("similarity_threshold", 0.9))
+    download_original = flask.request.json.get("download_original", False)
+    chunk_size = int(flask.request.json.get("chunk_size", 1000))
+    
+    # Count photos from picker
+    repo = MediaItemsRepository(user_id=user_id)
+    photo_count = repo.collection.count_documents(
+        {"userId": user_id, "pickerSource": True}
+    )
+    
+    if photo_count == 0:
+        return flask.jsonify({
+            "error": "no_photos",
+            "message": "No photos received from picker yet"
+        }), 400
+    
+    flask_app.logger.info(
+        f"Starting duplicate analysis on {photo_count} photos from picker"
+    )
+    
+    # Create task with picker source flag
+    task_args = {
+        "refresh_media_items": False,  # Don't fetch from API
+        "picker_source": True,  # Use picker-collected photos
+        "resolution": resolution,
+        "similarity_threshold": similarity_threshold,
+        "download_original": download_original,
+        "chunk_size": chunk_size,
+    }
+    
+    if "image_store_path" in flask.request.json:
+        image_store_path = flask.request.json.get("image_store_path")
+        try:
+            import os
+            image_store_path = os.path.abspath(os.path.expanduser(image_store_path))
+            os.makedirs(image_store_path, exist_ok=True)
+            if not os.access(image_store_path, os.W_OK):
+                return flask.jsonify({"error": "image_store_path_not_writable"}), 400
+        except Exception as e:
+            flask_app.logger.error("Invalid image_store_path provided: %s", e)
+            return flask.jsonify({"error": "invalid_image_store_path", "message": str(e)}), 400
+        
+        task_args["image_store_path"] = image_store_path
+    
+    # Start the task
+    task_id = tasks.process_duplicates.delay(user_id, **task_args)
+    
+    return flask.jsonify({
+        "success": True,
+        "task_id": str(task_id),
+        "photo_count": photo_count
+    })
+
+
 def task_results_for_display(results):
     repo = MediaItemsRepository(user_id=flask.session["user_id"])
     media_item_ids = [id for g in results["groups"] for id in g["mediaItemIds"]]

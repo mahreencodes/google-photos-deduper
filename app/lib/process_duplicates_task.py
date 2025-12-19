@@ -59,6 +59,7 @@ class ProcessDuplicatesTask:
         user_id: str,
         refresh_media_items: bool = False,
         extension_source: bool = False,
+        picker_source: bool = False,
         resolution: int = 250,
         similarity_threshold: float = 0.99,
         download_original: bool = False,
@@ -70,6 +71,7 @@ class ProcessDuplicatesTask:
         self.user_id = user_id
         self.refresh_media_items = refresh_media_items
         self.extension_source = extension_source
+        self.picker_source = picker_source
         self.resolution = resolution
         self.similarity_threshold = similarity_threshold
         self.download_original = download_original
@@ -118,6 +120,37 @@ class ProcessDuplicatesTask:
             self.complete_step(Steps.FETCH_MEDIA_ITEMS, count=media_items_count)
             self.update_meta(
                 log_message=f"Loaded {media_items_count} photos from extension. Starting duplicate detection...",
+                currentOperation="Starting duplicate analysis"
+            )
+            self.start_step(Steps.PROCESS_DUPLICATES)
+        # If using picker-sourced photos, skip API fetch
+        elif self.picker_source:
+            self.logger.info("Using picker-sourced photos, skipping API fetch")
+            self.update_meta(
+                log_message="Using photos from Google Photos Picker...",
+                currentOperation="Loading selected photos"
+            )
+            
+            # Count photos from picker
+            repo = MediaItemsRepository(user_id=self.user_id)
+            media_items_count = repo.collection.count_documents(
+                {"userId": self.user_id, "pickerSource": True}
+            )
+            
+            if media_items_count == 0:
+                self.logger.error("No picker-sourced photos found for user %s", self.user_id)
+                self.update_meta(log_message="No photos received from picker yet")
+                return {
+                    "error": "no_picker_photos",
+                    "user_id": self.user_id,
+                    "message": "Please use Google Photos Picker to select photos first"
+                }
+            
+            self.logger.info(f"Found {media_items_count} photos from picker")
+            self.meta["totalItems"] = media_items_count
+            self.complete_step(Steps.FETCH_MEDIA_ITEMS, count=media_items_count)
+            self.update_meta(
+                log_message=f"Loaded {media_items_count} selected photos. Starting duplicate detection...",
                 currentOperation="Starting duplicate analysis"
             )
             self.start_step(Steps.PROCESS_DUPLICATES)

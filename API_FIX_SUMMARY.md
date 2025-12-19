@@ -37,12 +37,12 @@ Even adding `photoslibrary.readonly.appcreateddata` **won't help** because:
 
 The Chrome Extension approach is not optional - it's the **ONLY way** to access the user's existing photos:
 
-| Method | Can Read Existing Photos? | Status |
-|--------|--------------------------|---------|
-| Google Photos API | ❌ NO (403 error) | Deprecated |
-| `photoslibrary.readonly.appcreateddata` | ❌ NO (only app-created) | Limited |
-| **Chrome Extension** | ✅ **YES (all photos)** | **Only Solution** |
-| Google Photos Picker API | ⚠️ Manual selection only | Alternative |
+| Method                                  | Can Read Existing Photos? | Status            |
+| --------------------------------------- | ------------------------- | ----------------- |
+| Google Photos API                       | ❌ NO (403 error)         | Deprecated        |
+| `photoslibrary.readonly.appcreateddata` | ❌ NO (only app-created)  | Limited           |
+| **Chrome Extension**                    | ✅ **YES (all photos)**   | **Only Solution** |
+| Google Photos Picker API                | ⚠️ Manual selection only  | Alternative       |
 
 ### Why NOT Picker API for Deduplication
 
@@ -74,6 +74,7 @@ Extension → Automatically discovers ALL 10,000 photos → Analyzes everything
 ### 1. Backend Changes (`process_duplicates_task.py`)
 
 **Added `extension_source` parameter:**
+
 ```python
 def __init__(
     self,
@@ -87,6 +88,7 @@ def __init__(
 ```
 
 **Skip API call when using extension data:**
+
 ```python
 if self.extension_source:
     # Count photos from MongoDB (sent by extension)
@@ -102,19 +104,20 @@ else:
 ### 2. Frontend Changes (`TaskOptionsPage.tsx`)
 
 **Added warning banner:**
+
 ```tsx
 <Alert severity="warning">
   <AlertTitle>⚠️ Important: API Changes (March 31, 2025)</AlertTitle>
-  Google Photos API no longer allows reading your entire library.
-  The "Refresh media items" option will fail with a 403 error.
-  
-  ✅ Recommended: Use the Chrome Extension instead
+  Google Photos API no longer allows reading your entire library. The "Refresh media
+  items" option will fail with a 403 error. ✅ Recommended: Use the Chrome Extension
+  instead
 </Alert>
 ```
 
 ### 3. Server Already Updated (`server.py`)
 
 The backend already has the endpoints for extension data:
+
 - ✅ `POST /api/extension/photos` - Receive photos from extension
 - ✅ `POST /api/extension/analyze` - Start analysis with `extension_source: true`
 - ✅ `GET /api/extension/status` - Check status
@@ -128,15 +131,18 @@ The backend already has the endpoints for extension data:
 2. **Click the Chrome Extension icon**
 
 3. **Click "Discover Photos"**
+
    - Extension scrolls through Google Photos
    - Discovers ALL photos in your library
    - No API limitations!
 
 4. **Click "Send to Backend"**
+
    - Uploads photo metadata in batches
    - Stores in MongoDB with `extensionSource: true`
 
 5. **Click "Start Analysis"**
+
    - Calls `/api/extension/analyze`
    - Sets `extension_source: true`
    - Skips the broken API call
@@ -157,19 +163,20 @@ The backend already has the endpoints for extension data:
 
 ## 📊 Comparison: Extension vs Picker API
 
-| Feature | Chrome Extension | Picker API |
-|---------|-----------------|------------|
-| **Auto-discover ALL photos** | ✅ Yes | ❌ No (manual selection) |
+| Feature                         | Chrome Extension         | Picker API                   |
+| ------------------------------- | ------------------------ | ---------------------------- |
+| **Auto-discover ALL photos**    | ✅ Yes                   | ❌ No (manual selection)     |
 | **Comprehensive deduplication** | ✅ Yes (sees everything) | ❌ No (only selected photos) |
-| **User effort** | 🎯 One click | 🔨 Select thousands manually |
-| **Speed** | ⚡ Automatic | 🐢 Very slow (manual) |
-| **Practical for 10K+ photos** | ✅ Yes | ❌ Impossible |
-| **Google official** | ⚠️ Web scraping | ✅ Official API |
-| **Works after March 31, 2025** | ✅ Yes | ⚠️ Limited use |
+| **User effort**                 | 🎯 One click             | 🔨 Select thousands manually |
+| **Speed**                       | ⚡ Automatic             | 🐢 Very slow (manual)        |
+| **Practical for 10K+ photos**   | ✅ Yes                   | ❌ Impossible                |
+| **Google official**             | ⚠️ Web scraping          | ✅ Official API              |
+| **Works after March 31, 2025**  | ✅ Yes                   | ⚠️ Limited use               |
 
 ### When to Use Picker API
 
 The Picker API could be useful for:
+
 - ✅ **Testing** - "Let me try with 50 photos first"
 - ✅ **Specific albums** - "Check just my vacation album"
 - ✅ **Incremental scanning** - "Scan only 2024 photos"
@@ -182,6 +189,7 @@ But for **full library deduplication**, the Chrome Extension is the only practic
 ### Google's Intent
 
 Google **intentionally** removed library-wide access to:
+
 1. **Increase privacy** - Apps can't silently read all your photos
 2. **Reduce abuse** - Prevents mass photo scraping
 3. **Push Picker API** - For one-off photo selection use cases
@@ -189,6 +197,7 @@ Google **intentionally** removed library-wide access to:
 ### Your App's Reality
 
 Your app needs **ALL photos** for deduplication:
+
 - Can't find duplicates without seeing the whole library
 - Manual selection of thousands of photos is impractical
 - Picker API defeats the purpose of "automatic" duplicate detection
@@ -221,6 +230,7 @@ Your app needs **ALL photos** for deduplication:
 ## 🎉 Result
 
 Your app now:
+
 - ✅ **Works after March 31, 2025**
 - ✅ **Handles API changes correctly**
 - ✅ **Provides clear user guidance**
@@ -231,16 +241,19 @@ Your app now:
 ## 🚀 Next Steps
 
 1. **Rebuild the extension:**
+
    ```bash
    cd chrome_extension
    docker compose -f docker-compose.yml run node npm run build
    ```
 
 2. **Reload extension in Chrome:**
+
    - Go to `chrome://extensions/`
    - Click the refresh icon on your extension
 
 3. **Test the new workflow:**
+
    - Navigate to photos.google.com
    - Click extension → "Discover Photos"
    - Click "Send to Backend"
@@ -266,8 +279,8 @@ Let me know if you want me to add Picker API integration as a secondary option!
 
 **Status:** ✅ **Fixed and Ready**  
 **Last Updated:** December 19, 2024  
-**Commits:** 
+**Commits:**
+
 - `1067037` - Fix: Handle API 403 error and prioritize Chrome Extension workflow
 - `310b6a0` - Feat: Adapt app for Google Photos API changes (March 2025)
 - `db66e3f` - Docs: Add comprehensive migration guide
-
