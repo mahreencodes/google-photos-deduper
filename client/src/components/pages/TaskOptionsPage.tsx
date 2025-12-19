@@ -83,11 +83,15 @@ export default function TaskOptionsPage() {
         <Alert severity="warning" sx={{ mb: 2 }}>
           <AlertTitle>⚠️ Important: API Changes (March 31, 2025)</AlertTitle>
           <Typography variant="body2" sx={{ mb: 1 }}>
-            Google Photos API no longer allows reading your entire library. 
-            <strong> The "Refresh media items" option will fail with a 403 error.</strong>
+            Google Photos API no longer allows reading your entire library.
+            <strong>
+              {" "}
+              The "Refresh media items" option will fail with a 403 error.
+            </strong>
           </Typography>
           <Typography variant="body2" sx={{ mb: 1 }}>
-            <strong>✅ Recommended:</strong> Use the <strong>Chrome Extension</strong> instead:
+            <strong>✅ Recommended:</strong> Use the{" "}
+            <strong>Chrome Extension</strong> instead:
           </Typography>
           <ol style={{ marginTop: 8, marginBottom: 8, paddingLeft: 20 }}>
             <li>Navigate to photos.google.com</li>

@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Box,
   Card,
@@ -122,16 +121,28 @@ export default function ScanModeSelector({
               </Typography>
 
               <Stack spacing={1} sx={{ mb: 2 }}>
-                <Typography variant="body2" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
                   ✅ <strong>Scans ALL photos automatically</strong>
                 </Typography>
-                <Typography variant="body2" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
                   ⚡ <strong>Fast & efficient</strong>
                 </Typography>
-                <Typography variant="body2" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
                   🎯 <strong>No manual selection needed</strong>
                 </Typography>
-                <Typography variant="body2" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
                   🔒 <strong>100% local processing</strong>
                 </Typography>
               </Stack>
@@ -152,7 +163,9 @@ export default function ScanModeSelector({
               </Typography>
 
               <Button
-                variant={selectedMode === "extension" ? "contained" : "outlined"}
+                variant={
+                  selectedMode === "extension" ? "contained" : "outlined"
+                }
                 fullWidth
                 sx={{
                   mt: 2,
@@ -260,16 +273,28 @@ export default function ScanModeSelector({
               </Typography>
 
               <Stack spacing={1} sx={{ mb: 2 }}>
-                <Typography variant="body2" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
                   🎯 <strong>Select specific photos/albums</strong>
                 </Typography>
-                <Typography variant="body2" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
                   🆕 <strong>Perfect for new photos only</strong>
                 </Typography>
-                <Typography variant="body2" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
                   ✅ <strong>Google's official picker</strong>
                 </Typography>
-                <Typography variant="body2" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
                   🧪 <strong>Great for testing</strong>
                 </Typography>
               </Stack>
@@ -369,4 +394,3 @@ export default function ScanModeSelector({
     </Box>
   );
 }
-

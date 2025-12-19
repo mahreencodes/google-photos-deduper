@@ -5,6 +5,7 @@
 After March 31, 2025 API changes, this app offers **TWO** powerful ways to find duplicates:
 
 ### 🔌 Method 1: Chrome Extension (Recommended for First-Time)
+
 **Best for:** Initial full library scan, large collections (10K+ photos)
 
 ✅ **Automatically discovers ALL photos**  
@@ -13,6 +14,7 @@ After March 31, 2025 API changes, this app offers **TWO** powerful ways to find 
 ✅ **Perfect for first-time users**
 
 ### 🖼️ Method 2: Google Photos Picker (Great for Updates)
+
 **Best for:** Monthly updates, new photos only, specific albums, testing
 
 ✅ **Manually select specific photos/albums**  
@@ -24,18 +26,19 @@ After March 31, 2025 API changes, this app offers **TWO** powerful ways to find 
 
 ## 📊 Quick Decision Guide
 
-| Your Situation | Recommended Method |
-|----------------|-------------------|
-| **First time using app** | 🔌 Chrome Extension |
-| **Have 1000+ photos** | 🔌 Chrome Extension |
-| **Already scanned once** | 🖼️ Picker (for new photos) |
-| **Want to check one album** | 🖼️ Picker |
-| **Testing the app** | 🖼️ Picker (small batch) |
-| **Monthly maintenance** | 🖼️ Picker (recent photos) |
+| Your Situation              | Recommended Method         |
+| --------------------------- | -------------------------- |
+| **First time using app**    | 🔌 Chrome Extension        |
+| **Have 1000+ photos**       | 🔌 Chrome Extension        |
+| **Already scanned once**    | 🖼️ Picker (for new photos) |
+| **Want to check one album** | 🖼️ Picker                  |
+| **Testing the app**         | 🖼️ Picker (small batch)    |
+| **Monthly maintenance**     | 🖼️ Picker (recent photos)  |
 
 ### Real-World Example
 
 **Week 1:**
+
 ```
 User has 50,000 photos (500GB) → Uses Chrome Extension
 → Discovers all 50,000 photos automatically
@@ -44,6 +47,7 @@ User has 50,000 photos (500GB) → Uses Chrome Extension
 ```
 
 **Week 2-52:**
+
 ```
 User adds 200 new photos per week → Uses Google Photos Picker
 → Selects only new photos from this week
@@ -97,6 +101,7 @@ docker-compose up --build
 ```
 
 Wait for:
+
 - ✅ Server running on http://localhost:5001
 - ✅ Client running on http://localhost:3000
 - ✅ MongoDB ready
@@ -119,6 +124,7 @@ docker compose -f docker-compose.yml run node npm run build
 ```
 
 **Get Extension ID:**
+
 1. Copy Extension ID from `chrome://extensions/`
 2. Add to Google Cloud Console → OAuth credentials
 3. Add to "Authorized JavaScript origins":
@@ -133,6 +139,7 @@ docker compose -f docker-compose.yml run node npm run build
 See `docs/PICKER_API_SETUP.md` for detailed setup.
 
 **Quick version:**
+
 1. Picker API is included in Google Photos Library API
 2. No additional setup needed (uses same OAuth)
 3. Works automatically once you're logged in
@@ -146,14 +153,17 @@ See `docs/PICKER_API_SETUP.md` for detailed setup.
 **Step-by-Step:**
 
 1. **Navigate to photos.google.com**
+
    - Make sure you're logged into your Google account
    - You should see all your photos
 
 2. **Click Extension Icon** (in Chrome toolbar)
+
    - Icon shows Google Photos Deduper logo
    - Popup opens showing 3 steps
 
 3. **Step 1: Discover Photos**
+
    ```
    Click "Discover Photos" button
    ↓
@@ -163,10 +173,11 @@ See `docs/PICKER_API_SETUP.md` for detailed setup.
    ↓
    Wait until: "✅ Discovered 10,000 photos!"
    ```
-   
+
    **Time estimate:** ~1-2 minutes per 1000 photos
 
 4. **Step 2: Send to Backend**
+
    ```
    Click "Send to Backend" button
    ↓
@@ -176,10 +187,11 @@ See `docs/PICKER_API_SETUP.md` for detailed setup.
    ↓
    Wait until: "✅ Sent all 10,000 photos to backend!"
    ```
-   
+
    **Time estimate:** ~30 seconds per 1000 photos
 
 5. **Step 3: Start Analysis**
+
    ```
    Click "Start Analysis" button
    ↓
@@ -189,6 +201,7 @@ See `docs/PICKER_API_SETUP.md` for detailed setup.
    ```
 
 6. **Monitor Progress in Web App**
+
    - Real-time photo counter
    - Processing speed (photos/second)
    - Time elapsed and ETA
@@ -196,6 +209,7 @@ See `docs/PICKER_API_SETUP.md` for detailed setup.
    - Duplicates found counter
 
 7. **Review Results**
+
    - See duplicate groups
    - Side-by-side comparison
    - Similarity percentages
@@ -209,15 +223,18 @@ See `docs/PICKER_API_SETUP.md` for detailed setup.
 ### Extension Troubleshooting
 
 **"Backend not reachable"**
+
 - Make sure app is running: `docker-compose up`
 - Check http://localhost:5001 is accessible
 
 **"Not logged in"**
+
 - Go to http://localhost:3000
 - Sign in with Google first
 - Then try extension again
 
 **"No photos found"**
+
 - Make sure you're on https://photos.google.com
 - Ensure you're on "Photos" tab (not Albums)
 - Try refreshing the page
@@ -231,15 +248,18 @@ See `docs/PICKER_API_SETUP.md` for detailed setup.
 **Step-by-Step:**
 
 1. **Open Web App**
+
    - Go to http://localhost:3000
    - Sign in with Google
 
 2. **Choose Scan Mode**
+
    - Click "Process Duplicates"
    - Select "Google Photos Picker" card
    - Beautiful UI shows 3 steps
 
 3. **Step 1: Select Photos**
+
    ```
    Click "Open Google Photos Picker"
    ↓
@@ -251,14 +271,16 @@ See `docs/PICKER_API_SETUP.md` for detailed setup.
    ↓
    Click "Select" when done
    ```
-   
+
    **Selection tips:**
+
    - Use date filters: "Photos from 2024"
    - Select albums: "Vacation 2024"
    - Use search: "Beach photos"
    - Multi-select: Hold Shift and click
 
 4. **Step 2: Send to Backend**
+
    ```
    Shows: "X photos selected"
    ↓
@@ -270,6 +292,7 @@ See `docs/PICKER_API_SETUP.md` for detailed setup.
    ```
 
 5. **Step 3: Start Analysis**
+
    ```
    Click "Start Analysis"
    ↓
@@ -286,16 +309,19 @@ See `docs/PICKER_API_SETUP.md` for detailed setup.
 ### Picker Troubleshooting
 
 **"Picker doesn't open"**
+
 - Make sure you're signed in to the web app
 - Check browser console for errors
 - Try refreshing the page
 
 **"Can't select photos"**
+
 - Ensure picker has loaded completely
 - Try selecting fewer photos at once
 - Check your Google Photos permissions
 
 **"Nothing happens after selecting"**
+
 - Click "Select" button in picker (top right)
 - Make sure photos are actually selected (checkmarks visible)
 
@@ -306,6 +332,7 @@ See `docs/PICKER_API_SETUP.md` for detailed setup.
 Both methods support the same analysis options:
 
 ### Resolution
+
 ```
 224px  - Fast, good accuracy (recommended)
 512px  - Slower, better accuracy
@@ -313,6 +340,7 @@ Both methods support the same analysis options:
 ```
 
 ### Similarity Threshold
+
 ```
 90%  - Very loose (more matches, some false positives)
 95%  - Balanced
@@ -320,6 +348,7 @@ Both methods support the same analysis options:
 ```
 
 ### Chunk Size
+
 ```
 500   - Low memory usage
 1000  - Balanced (default)
@@ -327,6 +356,7 @@ Both methods support the same analysis options:
 ```
 
 ### Image Storage Path
+
 ```
 Optional: Specify where to store downloaded images
 Default: /tmp/google-photos-images
@@ -339,32 +369,32 @@ Custom: /Users/you/Desktop/photo-analysis
 
 ### Chrome Extension Performance
 
-| Library Size | Discovery Time | Upload Time | Analysis Time |
-|--------------|----------------|-------------|---------------|
-| 1,000 photos | ~1 minute | ~30 seconds | ~5 minutes |
-| 10,000 photos | ~10 minutes | ~5 minutes | ~30 minutes |
-| 50,000 photos | ~45 minutes | ~20 minutes | ~2 hours |
-| 100,000 photos | ~90 minutes | ~40 minutes | ~4 hours |
+| Library Size   | Discovery Time | Upload Time | Analysis Time |
+| -------------- | -------------- | ----------- | ------------- |
+| 1,000 photos   | ~1 minute      | ~30 seconds | ~5 minutes    |
+| 10,000 photos  | ~10 minutes    | ~5 minutes  | ~30 minutes   |
+| 50,000 photos  | ~45 minutes    | ~20 minutes | ~2 hours      |
+| 100,000 photos | ~90 minutes    | ~40 minutes | ~4 hours      |
 
 ### Picker Performance
 
 Depends on how many photos you select:
 
 | Photos Selected | Selection Time | Upload Time | Analysis Time |
-|-----------------|----------------|-------------|---------------|
-| 100 photos | ~2 minutes | ~10 seconds | ~2 minutes |
-| 500 photos | ~5 minutes | ~30 seconds | ~5 minutes |
-| 1,000 photos | ~8 minutes | ~1 minute | ~10 minutes |
+| --------------- | -------------- | ----------- | ------------- |
+| 100 photos      | ~2 minutes     | ~10 seconds | ~2 minutes    |
+| 500 photos      | ~5 minutes     | ~30 seconds | ~5 minutes    |
+| 1,000 photos    | ~8 minutes     | ~1 minute   | ~10 minutes   |
 
 **Note:** Selection time is manual (how long you spend picking photos)
 
 ### Memory Usage
 
 | Photos Being Analyzed | RAM Usage | Disk Usage |
-|----------------------|-----------|------------|
-| 1,000 photos | ~500MB | ~2GB |
-| 5,000 photos | ~1GB | ~10GB |
-| 10,000 photos | ~2GB | ~20GB |
+| --------------------- | --------- | ---------- |
+| 1,000 photos          | ~500MB    | ~2GB       |
+| 5,000 photos          | ~1GB      | ~10GB      |
+| 10,000 photos         | ~2GB      | ~20GB      |
 
 ---
 
@@ -373,29 +403,34 @@ Depends on how many photos you select:
 Your beautiful interface includes:
 
 ✨ **Real-Time Progress**
+
 - Live photo counters with smooth animations
 - Processing speed in photos/second
 - Accurate time estimates (elapsed & remaining)
 - Current activity descriptions
 
 🎨 **Google Photos Branding**
+
 - Authentic color palette (🔴🟡🟢🔵)
 - Google Photos logo throughout
 - Material Design components
 - Smooth transitions and hover effects
 
 📊 **Rich Metrics**
+
 - Photos gathered/processed
 - Duplicates found
 - Storage that can be saved
 - Processing efficiency
 
 🎬 **Beautiful Backgrounds**
+
 - Looping video background
 - Responsive rotation on mobile
 - Subtle overlay for readability
 
 🖼️ **Photo Comparison**
+
 - Side-by-side duplicate preview
 - Similarity percentage
 - File size comparison
@@ -407,6 +442,7 @@ Your beautiful interface includes:
 ## 🔄 Hybrid Workflow: Best of Both Worlds
 
 **Month 1: Initial Cleanup**
+
 ```
 Use Chrome Extension:
 → Scan entire 50,000 photo library
@@ -417,6 +453,7 @@ Use Chrome Extension:
 ```
 
 **Month 2+: Maintenance**
+
 ```
 Use Google Photos Picker:
 → Select only "Photos from last 30 days"
@@ -427,6 +464,7 @@ Use Google Photos Picker:
 ```
 
 **Benefits:**
+
 - ✅ Complete initial cleanup with extension
 - ✅ Fast monthly maintenance with picker
 - ✅ Never need full re-scan
@@ -439,6 +477,7 @@ Use Google Photos Picker:
 Both methods are **100% secure and private**:
 
 ### Chrome Extension
+
 - ✅ All processing done locally on your machine
 - ✅ No data sent to external servers
 - ✅ Open source - review the code yourself
@@ -446,6 +485,7 @@ Both methods are **100% secure and private**:
 - ✅ No permanent access to your account
 
 ### Google Photos Picker
+
 - ✅ Official Google API
 - ✅ You explicitly select what to share
 - ✅ Google-controlled security
@@ -453,6 +493,7 @@ Both methods are **100% secure and private**:
 - ✅ Can revoke access anytime
 
 ### Backend Processing
+
 - ✅ Runs on YOUR computer (Docker)
 - ✅ No cloud processing
 - ✅ Images stored locally
@@ -477,16 +518,19 @@ Both methods are **100% secure and private**:
 ### Both Methods
 
 **"403 Permission Denied"**
+
 - You're trying to use old API method
 - Use Extension or Picker instead
 - See `API_FIX_SUMMARY.md`
 
 **"Task stuck at X%"**
+
 - Check worker logs: `docker-compose logs worker`
 - Look for errors in terminal
 - Try canceling and restarting
 
 **"Out of disk space"**
+
 - Analysis downloads images temporarily
 - Free up space or use smaller chunks
 - Images deleted after analysis
@@ -494,11 +538,13 @@ Both methods are **100% secure and private**:
 ### Extension-Specific
 
 **"Extension not found"**
+
 - Reload extension at `chrome://extensions/`
 - Rebuild: `docker compose -f chrome_extension/docker-compose.yml run node npm run build`
 - Check extension is enabled
 
 **"Discovery stops midway"**
+
 - Keep popup window open during discovery
 - Don't close Google Photos tab
 - Check internet connection
@@ -506,11 +552,13 @@ Both methods are **100% secure and private**:
 ### Picker-Specific
 
 **"Picker not loading"**
+
 - Sign in to web app first
 - Check browser console for errors
 - Ensure Google Photos Library API is enabled
 
 **"Selected photos not showing"**
+
 - Wait for picker to fully load
 - Try selecting fewer photos at once
 - Check selections have checkmarks
@@ -520,18 +568,21 @@ Both methods are **100% secure and private**:
 ## 💡 Pro Tips
 
 ### Extension Tips
+
 1. **Run at night** - Large scans can take hours
 2. **Keep popup open** - Discovery stops if closed
 3. **Good internet** - Faster discovery
 4. **First time only** - After initial scan, use picker
 
 ### Picker Tips
+
 1. **Use date filters** - "Photos from this month"
 2. **Select albums** - Check vacation albums
 3. **Batch testing** - Try with 100 photos first
 4. **Regular maintenance** - Monthly picker scans prevent buildup
 
 ### Analysis Tips
+
 1. **Start with 99% threshold** - Fewer false positives
 2. **Lower for similar shots** - 95% catches variations
 3. **Use chunks for large sets** - Saves memory
@@ -544,6 +595,7 @@ Both methods are **100% secure and private**:
 ### Typical Results
 
 **User 1: Large Library**
+
 - Library: 85,000 photos (800GB)
 - Method: Chrome Extension
 - Time: 3 hours (discovery + analysis)
@@ -551,6 +603,7 @@ Both methods are **100% secure and private**:
 - Saved: 120GB storage
 
 **User 2: Monthly Maintenance**
+
 - Previous cleanup: 3 months ago
 - New photos: 450
 - Method: Google Photos Picker
@@ -559,6 +612,7 @@ Both methods are **100% secure and private**:
 - Saved: 2GB storage
 
 **User 3: Specific Albums**
+
 - Album: "Europe Vacation 2024"
 - Photos: 1,200
 - Method: Google Photos Picker
@@ -592,4 +646,3 @@ Once your library is clean:
 **Both methods = Maximum flexibility! Choose what works best for your needs.** 🎯
 
 Last Updated: December 19, 2024
-

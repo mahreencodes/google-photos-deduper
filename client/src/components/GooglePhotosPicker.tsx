@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   Button,
@@ -14,8 +14,16 @@ import {
 import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 
+interface PhotoMetadata {
+  id: string;
+  name: string;
+  url: string;
+  mimeType: string;
+  sizeBytes?: number;
+}
+
 interface GooglePhotosPickerProps {
-  onPhotosSelected: (photos: any[]) => void;
+  onPhotosSelected: (photos: PhotoMetadata[]) => void;
   onAnalysisStart: () => void;
 }
 
@@ -24,7 +32,7 @@ export default function GooglePhotosPicker({
   onAnalysisStart,
 }: GooglePhotosPickerProps) {
   const [isPickerLoaded, setIsPickerLoaded] = useState(false);
-  const [selectedPhotos, setSelectedPhotos] = useState<any[]>([]);
+  const [selectedPhotos, setSelectedPhotos] = useState<PhotoMetadata[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [sendProgress, setSendProgress] = useState(0);
   const [status, setStatus] = useState<{
@@ -64,23 +72,27 @@ export default function GooglePhotosPicker({
 
       const { accessToken } = await response.json();
 
-      // @ts-ignore - Google Picker API types
-      gapi.load("picker", () => {
-        // @ts-ignore
-        const picker = new google.picker.PickerBuilder()
-          .addView(
-            // @ts-ignore
-            new google.picker.PhotosView()
-              .setType("flat")
-              .setMode("grid")
-          )
-          .setOAuthToken(accessToken)
-          .setDeveloperKey("YOUR_API_KEY") // Configure in environment
-          .setCallback(handlePickerCallback)
-          .build();
+      // Google Picker API - types not available, using window interface
+      const gapi = (window as Window & { gapi?: { load: (api: string, callback: () => void) => void } }).gapi;
+      const google = (window as Window & { google?: { picker: unknown } }).google;
 
-        picker.setVisible(true);
-      });
+      if (gapi && google) {
+        gapi.load("picker", () => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const pickerBuilder = new (google as any).picker.PickerBuilder();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const photoView = new (google as any).picker.PhotosView().setType("flat").setMode("grid");
+          
+          const picker = pickerBuilder
+            .addView(photoView)
+            .setOAuthToken(accessToken)
+            .setDeveloperKey("YOUR_API_KEY") // Configure in environment
+            .setCallback(handlePickerCallback)
+            .build();
+
+          picker.setVisible(true);
+        });
+      }
     } catch (error) {
       console.error("Error opening picker:", error);
       setStatus({
@@ -90,7 +102,7 @@ export default function GooglePhotosPicker({
     }
   };
 
-  const handlePickerCallback = (data: any) => {
+  const handlePickerCallback = (data: { action: string; docs?: PhotoMetadata[] }) => {
     if (data.action === "picked") {
       const photos = data.docs || [];
       setSelectedPhotos(photos);
@@ -178,20 +190,17 @@ export default function GooglePhotosPicker({
     try {
       setStatus({ type: "info", message: "Starting analysis..." });
 
-      const response = await fetch(
-        "http://localhost:5001/api/picker/analyze",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            resolution: 224,
-            similarity_threshold: 0.9,
-          }),
-        }
-      );
+      const response = await fetch("http://localhost:5001/api/picker/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          resolution: 224,
+          similarity_threshold: 0.9,
+        }),
+      });
 
       if (!response.ok) {
         throw new Error("Failed to start analysis");
@@ -348,7 +357,10 @@ export default function GooglePhotosPicker({
               >
                 {isSending ? (
                   <>
-                    <CircularProgress size={20} sx={{ mr: 1, color: "white" }} />
+                    <CircularProgress
+                      size={20}
+                      sx={{ mr: 1, color: "white" }}
+                    />
                     Sending...
                   </>
                 ) : (
@@ -432,4 +444,3 @@ export default function GooglePhotosPicker({
     </Box>
   );
 }
-
