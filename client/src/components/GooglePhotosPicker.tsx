@@ -73,16 +73,23 @@ export default function GooglePhotosPicker({
       const { accessToken } = await response.json();
 
       // Google Picker API - types not available, using window interface
-      const gapi = (window as Window & { gapi?: { load: (api: string, callback: () => void) => void } }).gapi;
-      const google = (window as Window & { google?: { picker: unknown } }).google;
+      const gapi = (
+        window as Window & {
+          gapi?: { load: (api: string, callback: () => void) => void };
+        }
+      ).gapi;
+      const google = (window as Window & { google?: { picker: unknown } })
+        .google;
 
       if (gapi && google) {
         gapi.load("picker", () => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const pickerBuilder = new (google as any).picker.PickerBuilder();
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const photoView = new (google as any).picker.PhotosView().setType("flat").setMode("grid");
-          
+          const photoView = new (google as any).picker.PhotosView()
+            .setType("flat")
+            .setMode("grid");
+
           const picker = pickerBuilder
             .addView(photoView)
             .setOAuthToken(accessToken)
@@ -102,7 +109,10 @@ export default function GooglePhotosPicker({
     }
   };
 
-  const handlePickerCallback = (data: { action: string; docs?: PhotoMetadata[] }) => {
+  const handlePickerCallback = (data: {
+    action: string;
+    docs?: PhotoMetadata[];
+  }) => {
     if (data.action === "picked") {
       const photos = data.docs || [];
       setSelectedPhotos(photos);
