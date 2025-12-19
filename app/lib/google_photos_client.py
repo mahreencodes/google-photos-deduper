@@ -23,7 +23,12 @@ class GooglePhotosClient(GoogleApiClient):
     def fetch_media_items(self, callback: Callable[[dict], None] = None):
         next_page_token = None
         item_count = 0
-        request_data = {"pageSize": 100}
+        # The Photos API caps pageSize at 100; request only the fields we need to
+        # reduce payload size using the `fields` parameter per the API docs.
+        request_data = {
+            "pageSize": 100,
+            "fields": "mediaItems(id,baseUrl,filename,mediaMetadata,mimeType),nextPageToken",
+        }
 
         self.logger.info("Fetching mediaItems...")
         last_log_time = time.time()

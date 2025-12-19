@@ -46,3 +46,25 @@ class TestRefreshCredentialsIfInvalid:
         result = client.get_media_items_by_ids([media_item["id"]])
         assert media_item["id"] in result
         assert result[media_item["id"]]["id"] == media_item["id"]
+
+    def test_fetch_media_items_uses_fields_param(self, mocker, credentials):
+        client = GooglePhotosClient(credentials, logger=mocker.Mock())
+
+        mock_resp = mocker.Mock()
+        mock_resp.json.return_value = {"mediaItems": []}
+        called = {}
+
+        def fake_get(url, params=None):
+            called['url'] = url
+            called['params'] = params
+            return mock_resp
+
+        mocker.patch.object(client.session, "get", side_effect=fake_get)
+
+        # call fetch_media_items (it should exit quickly because no mediaItems)
+        client.fetch_media_items()
+
+        assert called['url'] == "https://photoslibrary.googleapis.com/v1/mediaItems"
+        assert 'fields' in called['params']
+        assert 'pageSize' in called['params']
+        assert "mediaItems(id,baseUrl,filename,mediaMetadata,mimeType)" in called['params']['fields']
