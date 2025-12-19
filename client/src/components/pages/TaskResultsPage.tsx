@@ -3,9 +3,12 @@ import { appApiUrl } from "utils";
 import TaskResults from "components/TaskResults";
 import { useFetch } from "utils/useFetch";
 import CircularProgress from "@mui/material/CircularProgress";
+import Alert from "@mui/material/Alert";
+import AlertTitle from "@mui/material/AlertTitle";
 import { TaskResultsType } from "utils/types";
 import { useContext } from "react";
 import { AppContext } from "utils/AppContext";
+import CredentialsDiagnostics from "components/CredentialsDiagnostics";
 
 export default function TaskResultsPage() {
   const { data: results, isLoading } = useFetch<TaskResultsType>(
@@ -18,6 +21,9 @@ export default function TaskResultsPage() {
         <CircularProgress size={"2rem"} sx={{ mt: 2 }} />
       ) : (
         <>
+          {/* Diagnostic button to inspect stored credentials */}
+          <CredentialsDiagnostics />
+
           {results && (results as any).error ? (
             // If backend returned an error payload (e.g., insufficient scopes), show re-auth prompt
             <Alert severity="error" sx={{ mt: 2 }}>

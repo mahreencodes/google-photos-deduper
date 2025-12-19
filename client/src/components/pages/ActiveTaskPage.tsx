@@ -3,6 +3,7 @@ import { useContext } from "react";
 import { useInterval } from "utils/useInterval";
 import Button from "@mui/material/Button";
 import { AppContext } from "utils/AppContext";
+import CredentialsDiagnostics from "components/CredentialsDiagnostics";
 import SnackbarContent from "@mui/material/SnackbarContent";
 import { css } from "@emotion/react";
 import Alert from "@mui/material/Alert";
@@ -39,6 +40,9 @@ export default function ActiveTaskPage() {
 
   return (
     <>
+      {/* Provide quick access to credentials diagnostics */}
+      <CredentialsDiagnostics />
+
       {activeTask?.meta?.logMessage && (
         <SnackbarContent
           sx={{ my: 2 }}
