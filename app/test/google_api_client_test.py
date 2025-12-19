@@ -121,4 +121,26 @@ class TestRefreshCredentialsIfInvalid:
         assert any("HTTPError during API request: status=403" in rec.message for rec in caplog.records)
         assert any("Response body:" in rec.message for rec in caplog.records)
 
+    def test_insufficient_scopes_raises(self, credentials, mocker, caplog):
+        import logging
+        from app.lib.google_api_client import GoogleApiClient, InsufficientScopesError
+
+        client = GoogleApiClient(credentials, logger=logging.getLogger("test"))
+        mock_response = Mock(spec=requests.Response)
+        mock_response.status_code = 403
+        mock_response.text = '{"error": {"code": 403, "message": "Request had insufficient authentication scopes.", "status": "PERMISSION_DENIED"}}'
+        mock_request = Mock()
+        mock_request.url = "https://www.googleapis.com/userinfo/v2/me"
+        mock_request.method = "GET"
+        mock_response.request = mock_request
+
+        error = requests.exceptions.HTTPError(response=mock_response)
+        mocker.patch.object(client.session, "get", side_effect=error)
+
+        caplog.set_level(logging.ERROR)
+        with pytest.raises(InsufficientScopesError):
+            client.get_user_info()
+
+        assert any("Insufficient authentication scopes" in rec.message for rec in caplog.records)
+
         set_credentials.assert_called_once_with(new_credentials)

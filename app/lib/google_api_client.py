@@ -17,6 +17,10 @@ from app import config
 # Fetch user_id from Google
 
 
+class InsufficientScopesError(Exception):
+    """Raised when an API response indicates the stored token lacks required scopes."""
+
+
 class GoogleApiClient:
     @classmethod
     def from_user_id(cls, user_id: str, *args, **kwargs):
@@ -162,6 +166,22 @@ class GoogleApiClient:
                 )
             except Exception:
                 pass
+
+            # Detect insufficient authentication scopes and raise a clearer error
+            try:
+                body_text = (body or "").lower()
+            except Exception:
+                body_text = ""
+
+            if status == 403 and "insufficient authentication scopes" in body_text:
+                self.logger.error(
+                    "Insufficient authentication scopes for user %s; stored scopes=%s",
+                    getattr(self, "user_id", None),
+                    getattr(self.credentials_obj, "scopes", None),
+                )
+                raise InsufficientScopesError(
+                    "Insufficient authentication scopes. Ask the user to re-authorize the app (GET /auth/google)."
+                )
 
             raise error
 

@@ -36,6 +36,7 @@ class StoreImagesTask:
             try:
                 # Import here to avoid circular imports at module load
                 from app.lib.google_photos_client import GooglePhotosClient
+                from app.lib.google_api_client import InsufficientScopesError
 
                 client = GooglePhotosClient.from_user_id(self.user_id, logger=self.logger)
                 fetched_map = client.get_media_items_by_ids(missing_ids)
@@ -51,6 +52,10 @@ class StoreImagesTask:
                 media_item_id_map = self.repo.get_id_map(self.media_item_ids)
             except ValueError as e:
                 self.logger.error("No credentials for user %s: %s", self.user_id, e)
+                raise
+            except InsufficientScopesError as e:
+                self.logger.error("Insufficient scopes for user %s: %s", self.user_id, e)
+                # Re-raise so caller (_await_subtask_completion or run) can handle
                 raise
             except Exception as e:
                 self.logger.error("Error fetching missing media items for user %s: %s", self.user_id, e)

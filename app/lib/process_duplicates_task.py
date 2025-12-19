@@ -80,16 +80,38 @@ class ProcessDuplicatesTask:
 
     def run(self):
         self.start_step(Steps.FETCH_MEDIA_ITEMS)
-        client = GooglePhotosClient.from_user_id(
-            self.user_id,
-            logger=self.logger,
-        )
+        try:
+            client = GooglePhotosClient.from_user_id(
+                self.user_id,
+                logger=self.logger,
+            )
+        except ValueError as e:
+            self.logger.error("No credentials for user %s: %s", self.user_id, e)
+            self.update_meta(log_message="No credentials found; please re-authorize the app")
+            return {"error": "no_credentials", "user_id": self.user_id}
 
-        if self.refresh_media_items or client.local_media_items_count() == 0:
-            # Create mongo indexes if they haven't been created yet
-            MediaItemsRepository.create_indexes()
-            self._fetch_media_items(client)
-            self._await_subtask_completion()
+        try:
+            if self.refresh_media_items or client.local_media_items_count() == 0:
+                # Create mongo indexes if they haven't been created yet
+                MediaItemsRepository.create_indexes()
+                self._fetch_media_items(client)
+                self._await_subtask_completion()
+        except Exception as e:
+            # If a subtask failed due to insufficient scopes, return a clear result
+            from app.lib.google_api_client import InsufficientScopesError
+
+            if isinstance(e, InsufficientScopesError):
+                self.logger.error(
+                    "Insufficient authentication scopes for user %s", self.user_id
+                )
+                self.update_meta(log_message="Insufficient scopes; ask user to re-authorize")
+                return {
+                    "error": "insufficient_scopes",
+                    "user_id": self.user_id,
+                    "scopes": getattr(client.credentials_obj, "scopes", None),
+                }
+            # Re-raise other exceptions
+            raise
 
         media_items_count = client.local_media_items_count()
         self.complete_step(Steps.FETCH_MEDIA_ITEMS, count=media_items_count)
@@ -231,6 +253,16 @@ class ProcessDuplicatesTask:
                     s.result.get(disable_sync_subtasks=False, propagate=False)
                     for s in failed_subtasks
                 ]
+                from app.lib.google_api_client import InsufficientScopesError
+
+                if any(
+                    isinstance(e, InsufficientScopesError)
+                    for e in subtask_errors
+                ):
+                    # If any subtask failed due to insufficient scopes, surface that
+                    self.logger.error("Subtask failed due to insufficient scopes")
+                    raise InsufficientScopesError("One or more subtasks failed due to insufficient authentication scopes")
+
                 if any(
                     isinstance(e, requests.exceptions.HTTPError)
                     and "429 Client Error" in str(e)
