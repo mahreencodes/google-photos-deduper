@@ -60,7 +60,10 @@ def __get_oauth_flow(state: str = None) -> google_auth_oauthlib.flow.Flow:
             "openid",
             "https://www.googleapis.com/auth/userinfo.profile",
             "https://www.googleapis.com/auth/userinfo.email",
-            "https://www.googleapis.com/auth/photoslibrary",  # Access to both the photoslibrary.appendonly and photoslibrary.readonly scopes. Doesn't include photoslibrary.sharing or photoslibrary.edit access.
+            # Use the least-privileged Photos API scope required to list media items.
+            # If you later need to write or modify media, switch to the broader
+            # "https://www.googleapis.com/auth/photoslibrary" scope.
+            "https://www.googleapis.com/auth/photoslibrary.readonly",
         ],
         state=state,
     )

@@ -53,12 +53,15 @@ While a [hosted web app](https://github.com/mtalcott/google-photos-deduper/wiki#
     - Manually add scopes:
       - `https://www.googleapis.com/auth/userinfo.profile`
       - `https://www.googleapis.com/auth/userinfo.email`
-      - `https://www.googleapis.com/auth/photoslibrary`
+      - `https://www.googleapis.com/auth/photoslibrary.readonly` # Least-privilege scope to read media items
     - Update
     - Save and Continue
-  - Test users:
-    - Add your email (and any others you want to use the tool with)
-    - Save and Continue
+
+> Tip: If you run into a 403 "insufficient authentication scopes" error, ask the user to re-authorize the app (OAuth consent) so their token is granted the required scopes. You can force a fresh consent with `prompt=consent` when generating the authorization URL.
+
+- Test users:
+  - Add your email (and any others you want to use the tool with)
+  - Save and Continue
 - Go to APIs & Services > Credentials > Create Credentials > OAuth client ID
   - Application type: Choose `Web application`
   - Name: Enter `Photos Deduper Web Client`
@@ -66,7 +69,7 @@ While a [hosted web app](https://github.com/mtalcott/google-photos-deduper/wiki#
   - Authorized redirect URIs: Enter `http://localhost/auth/google/callback`
   - Create
 - Download the JSON file
-  
+
 </details>
 
 4\. Set up local environment variables.
