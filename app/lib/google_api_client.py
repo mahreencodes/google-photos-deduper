@@ -118,17 +118,52 @@ class GoogleApiClient:
 
         @return return value of func()
         """
-        # Would use `with` keyword and @contextmanager, but unfortunately it does
-        #   not support multiple yields: https://stackoverflow.com/a/16919782/379231
         try:
             return func()
         except requests.exceptions.HTTPError as error:
-            if error.response.status_code == 401:
+            resp = getattr(error, "response", None)
+            status = getattr(resp, "status_code", None)
+
+            # If unauthorized, refresh and retry
+            if status == 401:
+                self.logger.info("401 Unauthorized received; refreshing credentials")
                 self.refresh_credentials()
                 self.save_credentials()
                 return func()
-            else:
-                raise error
+
+            # For other HTTP errors (like 403), log details for debugging
+            try:
+                req = getattr(resp, "request", None)
+                url = getattr(req, "url", None) or getattr(resp, "url", None)
+                method = getattr(req, "method", None)
+                headers = getattr(resp, "headers", None)
+                body = getattr(resp, "text", None)
+            except Exception:
+                url = method = headers = body = None
+
+            self.logger.error(
+                f"HTTPError during API request: status={status}, method={method}, url={url}"
+            )
+            if headers:
+                # Keep this debug-level to avoid spamming normal logs
+                self.logger.debug(f"Response headers: {dict(headers)}")
+            if body:
+                truncated = body[:2000] + ("... (truncated)" if len(body) > 2000 else "")
+                self.logger.error(f"Response body: {truncated}")
+
+            # Add a small, safe snapshot of the credentials (masking token)
+            try:
+                token = getattr(self.credentials_obj, "token", None)
+                token_preview = token[-4:] if token else None
+                expiry = getattr(self.credentials_obj, "expiry", None)
+                scopes = getattr(self.credentials_obj, "scopes", None)
+                self.logger.debug(
+                    f"Credentials snapshot: token_present={bool(token)}, token_preview={token_preview}, expiry={expiry}, scopes={scopes}"
+                )
+            except Exception:
+                pass
+
+            raise error
 
     def save_credentials(self):
         credentials_as_dict = self.credentials_as_dict()

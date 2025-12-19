@@ -35,6 +35,11 @@ class GooglePhotosClient(GoogleApiClient):
             if next_page_token:
                 request_data["pageToken"] = next_page_token
 
+            # Debug context to help correlate requests with errors (403/401)
+            self.logger.debug(
+                f"Fetching mediaItems with request_data={request_data}, pageToken={next_page_token}"
+            )
+
             def func():
                 return self.session.get(
                     "https://photoslibrary.googleapis.com/v1/mediaItems",
