@@ -49,17 +49,23 @@ def refresh_session_credentials_if_invalid(
 # Scopes requested during OAuth consent. Exported so other modules (server/UI) can
 # inspect required scopes and surface proactive warnings if stored credentials
 # do not include them.
+#
+# NOTE: As of March 31, 2025, Google Photos API removed the following scopes:
+# - photoslibrary.readonly (can no longer read entire library via API)
+# - photoslibrary (full access scope)
+# - photoslibrary.sharing (sharing functionality)
+#
+# The app now relies on the Chrome Extension to discover photos directly from
+# the Google Photos web interface, bypassing the API limitation.
+# We keep minimal scopes for user identification only.
 REQUIRED_SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.profile",
     "https://www.googleapis.com/auth/userinfo.email",
-    # Request a superset of photo scopes to avoid oauthlib scope-change
-    # errors where Google may return previously-granted scopes. Including
-    # the standard readonly scope along with the app-created-data scopes
-    # prevents a 'Scope has changed' token parsing exception.
-    "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata",
-    "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata",
-    "https://www.googleapis.com/auth/photoslibrary.readonly",
+    # These scopes allow working with app-created data (albums/media)
+    # but are not required for the extension-based photo discovery approach
+    # "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata",
+    # "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata",
 ]
 
 

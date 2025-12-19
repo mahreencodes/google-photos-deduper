@@ -256,6 +256,155 @@ def get_recent_media_items():
     return flask.jsonify({"items": items_for_display, "count": len(items_for_display)})
 
 
+@flask_app.route("/api/extension/photos", methods=["POST"])
+def extension_receive_photos():
+    """
+    Receive photo metadata from Chrome extension.
+    Extension scrapes Google Photos web interface and sends data here.
+    """
+    user_id = flask.session.get("user_id")
+    if not user_id:
+        return flask.jsonify({"error": "not_logged_in"}), 401
+    
+    data = flask.request.json
+    photos = data.get("photos", [])
+    batch_number = data.get("batch_number", 1)
+    total_batches = data.get("total_batches", 1)
+    is_final = data.get("is_final", False)
+    
+    flask_app.logger.info(
+        f"Received batch {batch_number}/{total_batches} with {len(photos)} photos from extension"
+    )
+    
+    # Store photos in temporary collection for processing
+    repo = MediaItemsRepository(user_id=user_id)
+    
+    # Store each photo with extension source flag
+    for photo in photos:
+        photo_data = {
+            "userId": user_id,
+            "id": photo.get("id"),
+            "productUrl": photo.get("productUrl"),
+            "filename": photo.get("filename"),
+            "baseUrl": photo.get("baseUrl"),
+            "mimeType": photo.get("mimeType"),
+            "mediaMetadata": photo.get("mediaMetadata", {}),
+            "extensionSource": True,  # Flag to indicate source
+            "batchNumber": batch_number,
+        }
+        
+        # Upsert to avoid duplicates
+        repo.collection.update_one(
+            {"userId": user_id, "id": photo.get("id")},
+            {"$set": photo_data},
+            upsert=True
+        )
+    
+    # Return progress
+    total_stored = repo.collection.count_documents(
+        {"userId": user_id, "extensionSource": True}
+    )
+    
+    return flask.jsonify({
+        "success": True,
+        "received": len(photos),
+        "total_stored": total_stored,
+        "batch_number": batch_number,
+        "is_final": is_final
+    })
+
+
+@flask_app.route("/api/extension/analyze", methods=["POST"])
+def extension_trigger_analysis():
+    """
+    Trigger duplicate analysis on photos collected by the extension.
+    """
+    user_id = flask.session.get("user_id")
+    if not user_id:
+        return flask.jsonify({"error": "not_logged_in"}), 401
+    
+    # Get analysis options from request
+    resolution = int(flask.request.json.get("resolution", 224))
+    similarity_threshold = float(flask.request.json.get("similarity_threshold", 0.9))
+    download_original = flask.request.json.get("download_original", False)
+    chunk_size = int(flask.request.json.get("chunk_size", 1000))
+    
+    # Count photos from extension
+    repo = MediaItemsRepository(user_id=user_id)
+    photo_count = repo.collection.count_documents(
+        {"userId": user_id, "extensionSource": True}
+    )
+    
+    if photo_count == 0:
+        return flask.jsonify({
+            "error": "no_photos",
+            "message": "No photos received from extension yet"
+        }), 400
+    
+    flask_app.logger.info(
+        f"Starting duplicate analysis on {photo_count} photos from extension"
+    )
+    
+    # Create task with extension source flag
+    task_args = {
+        "refresh_media_items": False,  # Don't fetch from API
+        "extension_source": True,  # Use extension-collected photos
+        "resolution": resolution,
+        "similarity_threshold": similarity_threshold,
+        "download_original": download_original,
+        "chunk_size": chunk_size,
+    }
+    
+    if "image_store_path" in flask.request.json:
+        image_store_path = flask.request.json.get("image_store_path")
+        try:
+            import os
+            image_store_path = os.path.abspath(os.path.expanduser(image_store_path))
+            os.makedirs(image_store_path, exist_ok=True)
+            if not os.access(image_store_path, os.W_OK):
+                return flask.jsonify({"error": "image_store_path_not_writable"}), 400
+        except Exception as e:
+            flask_app.logger.error("Invalid image_store_path provided: %s", e)
+            return flask.jsonify({"error": "invalid_image_store_path", "message": str(e)}), 400
+        
+        task_args["image_store_path"] = image_store_path
+    
+    # Start the task
+    task_id = tasks.process_duplicates.delay(user_id, **task_args)
+    
+    return flask.jsonify({
+        "success": True,
+        "task_id": str(task_id),
+        "photo_count": photo_count
+    })
+
+
+@flask_app.route("/api/extension/status", methods=["GET"])
+def extension_get_status():
+    """
+    Get status of extension photo collection and analysis.
+    """
+    user_id = flask.session.get("user_id")
+    if not user_id:
+        return flask.jsonify({"error": "not_logged_in"}), 401
+    
+    repo = MediaItemsRepository(user_id=user_id)
+    
+    # Count photos from extension
+    photo_count = repo.collection.count_documents(
+        {"userId": user_id, "extensionSource": True}
+    )
+    
+    # Get task status if exists
+    task = tasks.get_active_task(user_id)
+    
+    return flask.jsonify({
+        "photo_count": photo_count,
+        "has_active_task": task is not None,
+        "task": task_for_display(task) if task else None
+    })
+
+
 def task_results_for_display(results):
     repo = MediaItemsRepository(user_id=flask.session["user_id"])
     media_item_ids = [id for g in results["groups"] for id in g["mediaItemIds"]]

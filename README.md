@@ -1,129 +1,306 @@
-> [!WARNING]  
-> **Unfortunately, due to [breaking changes in the Google Photos API](https://developers.google.com/photos/support/updates) this tool will stop working on March 31, 2025.** Discussion [here](https://github.com/mtalcott/google-photos-deduper/discussions/65).
-
 # Google Photos Deduper
 
-[![Python tests build badge](https://github.com/mtalcott/google-photos-deduper/actions/workflows/python-tests.yml/badge.svg?branch=main)](https://github.com/mtalcott/google-photos-deduper/actions/workflows/python-tests.yml?query=branch%3Amain)
+> ⚠️ **NEW: Migration Required for March 31, 2025 API Changes**  
+> Google Photos API has removed scopes that allowed reading entire libraries. This tool now uses an **enhanced Chrome Extension** to discover photos directly from the Google Photos web interface. See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for details.
 
-Locally run web app + Chrome extension to delete duplicates in Google Photos. Built with:
+A locally run web app and Chrome extension to find and remove duplicate photos from Google Photos.
 
-[![Google Photos API](https://img.shields.io/badge/Google_Photos_API-F5F7F9.svg?logo=googlephotos)](https://developers.google.com/photos)
-[![Python](https://img.shields.io/badge/Python-F5F7F9.svg?logo=python)](https://www.python.org/)
-[![MediaPipe](https://img.shields.io/badge/MediaPipe-F5F7F9.svg)](https://developers.google.com/mediapipe)
-[![TypeScript](https://img.shields.io/badge/TypeScript-F5F7F9.svg?logo=typescript)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-F5F7F9.svg?logo=vite)](https://vitejs.dev/)
-[![React](https://img.shields.io/badge/React-F5F7F9.svg?logo=react)](https://react.dev/)
-[![MUI](https://img.shields.io/badge/MUI-F5F7F9.svg?logo=mui)](https://mui.com/)
-[![CRXJS](https://img.shields.io/badge/CRXJS-F5F7F9.svg)](https://crxjs.dev/vite-plugin)
-[![Docker](https://img.shields.io/badge/Docker-F5F7F9.svg?logo=docker)](https://www.docker.com/)
+[![Demo Video](https://img.shields.io/badge/Watch-Demo%20Video-red?style=for-the-badge&logo=youtube)](https://www.youtube.com/watch?v=YOUR_VIDEO)
+[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-blue?style=for-the-badge&logo=google-chrome)](chrome_extension/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-## Demo
+## ✨ Features
 
-[![Demo](https://google-photos-deduper-public.s3.amazonaws.com/demo-l.gif)](https://youtu.be/QDUGKgQOa7o)
+- 🎯 **Accurate Duplicate Detection** - Uses advanced ML image embeddings (MediaPipe + MobileNet V3)
+- 🚀 **Fast Processing** - Optimized for large libraries with chunked processing
+- 🎨 **Beautiful Modern UI** - Google Photos-inspired design with rich metrics
+- 🔒 **100% Local & Private** - All processing happens on your machine
+- 🌐 **Chrome Extension** - Seamlessly discovers and deletes photos via web interface
+- 📊 **Rich Progress Tracking** - Real-time metrics, ETAs, and visual feedback
+- 🎭 **Interactive Results** - Side-by-side comparison with similarity percentages
 
-## Getting Started
+## 🚨 Important: API Changes (March 31, 2025)
 
-While a [hosted web app](https://github.com/mtalcott/google-photos-deduper/wiki#hosted-app) would be ideal, one is not currently provided due to [API usage limits](https://developers.google.com/photos/library/guides/api-limits-quotas), the overhead of [Google's app verification process](https://support.google.com/cloud/answer/9110914), cost, and user privacy considerations. Instead, follow these instructions to get the app up and running locally:
+Google has removed the following scopes from the Photos Library API:
+- ❌ `photoslibrary.readonly` - Can no longer read entire library
+- ❌ `photoslibrary` - Full access scope removed
+- ❌ `photoslibrary.sharing` - Sharing functionality removed
 
-### Setup
+**Solution:** This app now uses an **Enhanced Chrome Extension** that:
+- Discovers photos directly from Google Photos web interface
+- No API limitations - can access your entire library
+- More reliable and user-controlled
+- Handles both discovery AND deletion
 
-1\. Install [Docker Desktop](https://docs.docker.com/desktop/) on your system.
+See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for complete details.
 
-2\. [Clone](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) this repository.
+## 🎬 How It Works
 
-<details>
+### New Extension-Based Workflow
 
-<summary>3. Create a Google Cloud project and OAuth credentials.</summary>
-<br>
+```mermaid
+graph LR
+    A[Install Extension] --> B[Navigate to photos.google.com]
+    B --> C[Click 'Discover Photos']
+    C --> D[Extension scans library]
+    D --> E[Send data to local backend]
+    E --> F[Start duplicate analysis]
+    F --> G[Review results in web app]
+    G --> H[Delete duplicates via extension]
+```
 
-- Create a Google Cloud project ([Guide](https://developers.google.com/workspace/guides/create-project))
-  - Project name: Enter `Photos Deduper`
-  - Select the project
-- Go to APIs & Services > Enable APIs and Services
-  - Search for `Photos Library API`
-  - Enable
-- Go to APIs & Services > OAuth consent screen
-  - User Type: Choose `External`
-  - Create
-    - App name: Enter `Photos Deduper`
-    - User support email: Choose your email
-    - Developer contact information: Enter your email
-    - Save and Continue
-  - Add or remove scopes:
-    - Manually add scopes (the app requests these scopes at OAuth consent):
+### Technical Overview
 
-      - `https://www.googleapis.com/auth/userinfo.profile`
-      - `https://www.googleapis.com/auth/userinfo.email`
-      - `https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata` — edit photos, videos, and albums created by this app
-      - `https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata` — read app-created media
+1. **Photo Discovery** (Chrome Extension)
+   - Scrolls through Google Photos web interface
+   - Extracts photo metadata from DOM
+   - Sends batches to local backend
 
-      (Note: the app also includes `https://www.googleapis.com/auth/photoslibrary.readonly` during the OAuth flow to avoid oauthlib parsing issues when scopes change.)
+2. **Duplicate Detection** (Python Backend)
+   - Downloads images for analysis
+   - Generates image embeddings using ML models
+   - Calculates similarity using cosine distance
+   - Groups duplicates using community detection
 
-    - Update
-    - Save and Continue
+3. **Review & Delete** (Web App + Extension)
+   - Beautiful UI shows duplicate groups
+   - Side-by-side comparison
+   - Extension handles deletion via web interface
 
-> Tip: If you run into a 403 "insufficient authentication scopes" error, ask the user to re-authorize the app (OAuth consent) so their token is granted the required scopes. You can force a fresh consent with `prompt=consent` when generating the authorization URL.
+## 🚀 Quick Start
 
-> The server exposes a `/api/credentials` endpoint that returns `required_scopes` and any `missing_scopes` for the stored credentials; the UI surfaces these via the **Credentials Diagnostics** panel to help users re-authorize with the correct scopes.
+### Prerequisites
 
-- Test users:
-  - Add your email (and any others you want to use the tool with)
-  - Save and Continue
-- Go to APIs & Services > Credentials > Create Credentials > OAuth client ID
-  - Application type: Choose `Web application`
-  - Name: Enter `Photos Deduper Web Client`
-  - Authorized JavaScript origins: Enter `http://localhost`
-  - Authorized redirect URIs: Enter `http://localhost/auth/google/callback`
-  - Create
-- Download the JSON file
+- **Docker** & **Docker Compose**
+- **Chrome Browser** (for extension)
+- **Google Account** with Google Photos
 
-</details>
+### Installation
 
-4\. Set up local environment variables.
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/mahreencodes/google-photos-deduper.git
+   cd google-photos-deduper
+   ```
 
-- `cp example.env .env`
-- Generate [`FLASK_SECRET_KEY`](https://flask.palletsprojects.com/en/2.3.x/config/#SECRET_KEY) with `python -c 'import secrets; print(secrets.token_hex())'` and add it to `.env`.
-- Add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from the `client_id` and `client_secret` values from the client secret file created above.
+2. **Set up Google Cloud Project**
+   
+   See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md#google-cloud-console-configuration) for detailed steps.
+   
+   Quick summary:
+   - Create project at [Google Cloud Console](https://console.cloud.google.com/)
+   - Enable "Google Photos Library API" (for user info only)
+   - Create OAuth 2.0 credentials
+   - Download as `client_secret.json` in project root
+   - Update OAuth consent screen (remove deprecated scopes)
 
-### Start
+3. **Configure environment**
+   ```bash
+   cp example.env .env
+   # Edit .env and add your configuration
+   ```
 
-1. Run `docker compose up` from the project directory.
-1. Load [http://localhost](http://localhost) and follow the instructions from there!
-   - [Install the Chrome Extension](chrome_extension/README.md) once you want to delete duplicates.
+4. **Start the application**
+   ```bash
+   docker-compose up --build
+   ```
 
-## Support
+5. **Build Chrome Extension**
+   ```bash
+   docker compose -f chrome_extension/docker-compose.yml run node npm run build
+   ```
 
-If you found a bug or have a feature request, please [open an issue](https://github.com/mtalcott/google-photos-deduper/issues/new/choose).
+6. **Load Extension in Chrome**
+   - Navigate to `chrome://extensions/`
+   - Enable "Developer mode"
+   - Click "Load unpacked"
+   - Select `chrome_extension/dist` directory
 
-If you have questions about the tool, please [post on the discussions page](https://github.com/mtalcott/google-photos-deduper/discussions).
+7. **Access the web app**
+   - Open http://localhost:3000
+   - Log in with your Google account
 
-## Development
+## 📖 Usage Guide
 
-- Python app
-  - Flask is set to debug mode, so live reloading is enabled.
-  - Debugging with `debugpy` is supported. See [`launch.json`](.vscode/launch.json).
-- React app
-  - Utilizes [Vite](https://vitejs.dev/) for HMR and building.
-- Chrome extension
-  - Utilizes the [CRXJS Vite Plugin](https://crxjs.dev/vite-plugin) for HMR and building.
+### Step 1: Discover Photos
 
-## Docs
+1. Navigate to https://photos.google.com in Chrome
+2. Click the extension icon (📸) in your browser toolbar
+3. Click "Discover Photos" button
+4. Wait while extension scans your library (progress shown in popup)
+5. Click "Send to Backend" once discovery is complete
 
-- Dedup workflow and architecture: `docs/DEDUP-WORKFLOW.md` (explains chunking, embeddings, grouping, and storage options)
-- Development & testing notes (heavy dependencies and running tests): `docs/DEVELOPMENT.md`
+### Step 2: Start Analysis
 
-## Motivation
+1. Click "Start Analysis" in the extension popup
+2. Or go to the web app and use the "Process Duplicates" page
+3. Configure options:
+   - **Resolution** (224px recommended for speed)
+   - **Similarity Threshold** (0.9 = 90% similar)
+   - **Chunk Size** (1000 photos per batch)
+   - **Image Storage Path** (where to store downloaded images)
 
-I've been a long-time user of [Google Photos](http://photos.google.com). When [Picasa Web Albums](https://picasa.google.com) retired, my cloud photos and albums moved to Google Photos. I have used nearly every desktop client Google provided from Picasa, to the old Google Photos desktop uploader, to [Google Drive's built-in Photos integration](https://www.blog.google/products/photos/simplifying-google-photos-and-google-drive/), and finally to [Backup and Sync](https://www.google.com/drive/download/backup-and-sync/).
+### Step 3: Monitor Progress
 
-Google has improved duplicate detection upon upload in recent years, but that wasn't always the case. I have tens of thousands of photos across hundreds of albums that were at some point duplicated by a desktop client. Also, even today, deleting, re-uploading, then restoring a photo results in a duplicate.
+The beautiful web interface shows:
+- 📸 Photos loaded from extension
+- 🔍 Photos being analyzed
+- ⏱️ Elapsed time and ETA
+- 📊 Processing speed
+- 🎯 Duplicates found
 
-This could probably be solved by clearing out my Photos data and re-uploading everything. However, that would remove all album organization and photo descriptions. Instead, it's preferred to remove duplicates in-place. [Searches](https://support.google.com/photos/thread/3954223/is-there-an-easy-way-to-delete-duplicate-photos?hl=en) [show](https://www.quora.com/How-does-one-delete-duplicate-photos-in-Google-Photos-from-the-web-or-from-the-app-Is-there-feature-where-you-can-scan-and-delete-for-duplicates) interest in this feature from the Google Photos user base, but it hasn't ever made its way into the product.
+### Step 4: Review Results
 
-The existing tools I could find for this problem did so only with media on the local computer, felt scammy, or didn't fully automate the deletion process. So I created this one.
+- See duplicate groups with similarity percentages
+- Side-by-side photo comparison
+- File size and dimensions
+- Original vs duplicate indicators
 
-It turns out the [Google Photos API](https://developers.google.com/photos) is quite limited. While apps can read limited metadata about the media items in a user's library, they cannot delete media items (photos and videos), and they can only modify media items uploaded by the app itself. This means we can't, for example, add all of the duplicates to an album for the user to review. This necessitates some kind of tool to automate the deletion of duplicates. Since we've already bought in to the Google ecosystem as a Photos user, I chose to do this with a complementary Chrome extension.
+### Step 5: Delete Duplicates
 
-## Say Thanks
+1. Select duplicates you want to remove
+2. Click "Delete Selected"
+3. Extension automatically handles deletion via Google Photos web interface
 
-If you found this project useful, give it a star!
+## 🎨 UI Highlights
+
+- **Google Photos Color Palette** - Authentic look and feel
+- **Animated Progress Cards** - Real-time metrics with smooth animations
+- **Video Background** - Beautiful looping background
+- **Responsive Design** - Works on desktop and mobile
+- **Rich Metrics** - Photos gathered, processed, time estimates, processing speed
+- **Interactive Gallery** - Recently processed photos with hover effects
+
+## ⚙️ Configuration Options
+
+### Backend Configuration (`.env`)
+
+```bash
+# Google OAuth
+GOOGLE_CLIENT_ID=your_client_id
+GOOGLE_CLIENT_SECRET=your_client_secret
+
+# Database
+MONGODB_URI=mongodb://mongo:27017
+DATABASE=google_photos_deduper
+
+# Storage
+IMAGE_STORE_PATH=/tmp/google-photos-images
+PUBLIC_IMAGE_FOLDER=http://localhost:5001/images
+
+# Server
+CLIENT_HOST=http://localhost:3000
+```
+
+### Analysis Options
+
+- **Resolution**: Image size for analysis (224, 512, 1024)
+  - Lower = faster but less accurate
+  - Higher = slower but more accurate
+  
+- **Similarity Threshold**: 0.0-1.0 (default: 0.9)
+  - Higher = only very similar photos
+  - Lower = more loose matching
+  
+- **Chunk Size**: Photos per batch (default: 1000)
+  - Affects memory usage
+  - Adjust based on available RAM
+
+## 🔧 Development
+
+### Project Structure
+
+```
+google-photos-deduper/
+├── app/                    # Python backend (Flask + Celery)
+│   ├── lib/               # Core logic (duplicate detection)
+│   ├── models/            # Database models
+│   └── server.py          # API endpoints
+├── client/                # React frontend
+│   ├── src/
+│   │   ├── components/    # UI components
+│   │   ├── utils/         # Helpers and context
+│   │   └── theme.ts       # Material-UI theme
+├── chrome_extension/      # Chrome Extension
+│   ├── src/
+│   │   ├── scripts/       # Content scripts
+│   │   ├── popup.ts       # Extension popup
+│   │   └── types.ts       # TypeScript types
+│   └── src_manifest.json  # Extension manifest
+└── docs/                  # Documentation
+```
+
+### Running Tests
+
+```bash
+# Backend tests
+docker-compose run --rm server pytest
+
+# Frontend tests
+docker-compose run --rm client npm test
+```
+
+### Development Mode
+
+```bash
+# Backend with hot reload
+docker-compose up server worker
+
+# Frontend with hot reload
+docker-compose up client
+
+# Extension rebuild
+cd chrome_extension
+docker compose -f docker-compose.yml run node npm run build
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Original project by [mtalcott](https://github.com/mtalcott/google-photos-deduper)
+- MediaPipe for image embedding models
+- Google Photos API documentation
+- Material-UI for React components
+
+## 📚 Additional Documentation
+
+- [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) - API migration details
+- [DEDUP-WORKFLOW.md](./docs/DEDUP-WORKFLOW.md) - Technical workflow explanation
+- [DEVELOPMENT.md](./docs/DEVELOPMENT.md) - Development setup
+
+## ⭐ Star History
+
+If you find this project useful, please give it a star! ⭐
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/mahreencodes/google-photos-deduper/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/mahreencodes/google-photos-deduper/discussions)
+
+## 🔮 Roadmap
+
+- [ ] Google Photos Picker API integration (alternative to extension)
+- [ ] Video duplicate detection
+- [ ] Advanced filters (date range, album, etc.)
+- [ ] Bulk editing features
+- [ ] Export duplicate reports
+- [ ] Mobile app support
+
+---
+
+**Made with ❤️ for the Google Photos community**
+
+**Note:** This tool is not affiliated with or endorsed by Google. Use at your own risk.
