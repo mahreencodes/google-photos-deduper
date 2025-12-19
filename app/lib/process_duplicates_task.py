@@ -58,6 +58,7 @@ class ProcessDuplicatesTask:
         task: celery.Task,
         user_id: str,
         refresh_media_items: bool = False,
+        extension_source: bool = False,
         resolution: int = 250,
         similarity_threshold: float = 0.99,
         download_original: bool = False,
@@ -68,6 +69,7 @@ class ProcessDuplicatesTask:
         self.task = task
         self.user_id = user_id
         self.refresh_media_items = refresh_media_items
+        self.extension_source = extension_source
         self.resolution = resolution
         self.similarity_threshold = similarity_threshold
         self.download_original = download_original
@@ -87,44 +89,78 @@ class ProcessDuplicatesTask:
 
     def run(self):
         self.start_step(Steps.FETCH_MEDIA_ITEMS)
-        try:
-            client = GooglePhotosClient.from_user_id(
-                self.user_id,
-                logger=self.logger,
+        
+        # If using extension-sourced photos, skip API fetch
+        if self.extension_source:
+            self.logger.info("Using extension-sourced photos, skipping API fetch")
+            self.update_meta(
+                log_message="Using photos from Chrome Extension...",
+                currentOperation="Loading photos from extension"
             )
-        except ValueError as e:
-            self.logger.error("No credentials for user %s: %s", self.user_id, e)
-            self.update_meta(log_message="No credentials found; please re-authorize the app")
-            return {"error": "no_credentials", "user_id": self.user_id}
-
-        try:
-            if self.refresh_media_items or client.local_media_items_count() == 0:
-                # Create mongo indexes if they haven't been created yet
-                MediaItemsRepository.create_indexes()
-                self._fetch_media_items(client)
-                self._await_subtask_completion()
-        except Exception as e:
-            # If a subtask failed due to insufficient scopes, return a clear result
-            from app.lib.google_api_client import InsufficientScopesError
-
-            if isinstance(e, InsufficientScopesError):
-                self.logger.error(
-                    "Insufficient authentication scopes for user %s", self.user_id
-                )
-                self.update_meta(log_message="Insufficient scopes; ask user to re-authorize")
+            
+            # Count photos from extension
+            repo = MediaItemsRepository(user_id=self.user_id)
+            media_items_count = repo.collection.count_documents(
+                {"userId": self.user_id, "extensionSource": True}
+            )
+            
+            if media_items_count == 0:
+                self.logger.error("No extension-sourced photos found for user %s", self.user_id)
+                self.update_meta(log_message="No photos received from extension yet")
                 return {
-                    "error": "insufficient_scopes",
+                    "error": "no_extension_photos",
                     "user_id": self.user_id,
-                    "scopes": getattr(client.credentials_obj, "scopes", None),
+                    "message": "Please use the Chrome Extension to discover photos first"
                 }
-            # Re-raise other exceptions
-            raise
+            
+            self.logger.info(f"Found {media_items_count} photos from extension")
+            self.meta["totalItems"] = media_items_count
+            self.complete_step(Steps.FETCH_MEDIA_ITEMS, count=media_items_count)
+            self.update_meta(
+                log_message=f"Loaded {media_items_count} photos from extension. Starting duplicate detection...",
+                currentOperation="Starting duplicate analysis"
+            )
+            self.start_step(Steps.PROCESS_DUPLICATES)
+        else:
+            # Original API-based flow (still available for backward compatibility)
+            try:
+                client = GooglePhotosClient.from_user_id(
+                    self.user_id,
+                    logger=self.logger,
+                )
+            except ValueError as e:
+                self.logger.error("No credentials for user %s: %s", self.user_id, e)
+                self.update_meta(log_message="No credentials found; please re-authorize the app")
+                return {"error": "no_credentials", "user_id": self.user_id}
 
-        media_items_count = client.local_media_items_count()
-        self.meta["totalItems"] = media_items_count
-        self.complete_step(Steps.FETCH_MEDIA_ITEMS, count=media_items_count)
-        self.update_meta(log_message=f"Fetched {media_items_count} media items. Starting duplicate detection...")
-        self.start_step(Steps.PROCESS_DUPLICATES)
+            try:
+                if self.refresh_media_items or client.local_media_items_count() == 0:
+                    # Create mongo indexes if they haven't been created yet
+                    MediaItemsRepository.create_indexes()
+                    self._fetch_media_items(client)
+                    self._await_subtask_completion()
+            except Exception as e:
+                # If a subtask failed due to insufficient scopes, return a clear result
+                from app.lib.google_api_client import InsufficientScopesError
+
+                if isinstance(e, InsufficientScopesError):
+                    self.logger.error(
+                        "Insufficient authentication scopes for user %s", self.user_id
+                    )
+                    self.update_meta(log_message="Insufficient scopes; ask user to re-authorize")
+                    return {
+                        "error": "insufficient_scopes",
+                        "user_id": self.user_id,
+                        "scopes": getattr(client.credentials_obj, "scopes", None),
+                    }
+                # Re-raise other exceptions
+                raise
+
+            media_items_count = client.local_media_items_count()
+            self.meta["totalItems"] = media_items_count
+            self.complete_step(Steps.FETCH_MEDIA_ITEMS, count=media_items_count)
+            self.update_meta(log_message=f"Fetched {media_items_count} media items. Starting duplicate detection...")
+            self.start_step(Steps.PROCESS_DUPLICATES)
 
         # Determine default chunk size if not set
         if not self.chunk_size:

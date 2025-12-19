@@ -15,6 +15,9 @@ import { useForm, Controller, SubmitHandler } from "react-hook-form";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
 import InfoIcon from "@mui/icons-material/Info";
+import Alert from "@mui/material/Alert";
+import AlertTitle from "@mui/material/AlertTitle";
+import Typography from "@mui/material/Typography";
 
 interface FormData {
   refresh_media_items: boolean;
@@ -77,6 +80,26 @@ export default function TaskOptionsPage() {
   return (
     <form noValidate autoComplete="off" onSubmit={handleSubmit(onSubmit)}>
       <Stack direction="column" spacing={3} sx={{ mt: 2 }}>
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          <AlertTitle>⚠️ Important: API Changes (March 31, 2025)</AlertTitle>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Google Photos API no longer allows reading your entire library. 
+            <strong> The "Refresh media items" option will fail with a 403 error.</strong>
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            <strong>✅ Recommended:</strong> Use the <strong>Chrome Extension</strong> instead:
+          </Typography>
+          <ol style={{ marginTop: 8, marginBottom: 8, paddingLeft: 20 }}>
+            <li>Navigate to photos.google.com</li>
+            <li>Click the extension icon</li>
+            <li>Click "Discover Photos"</li>
+            <li>Click "Send to Backend"</li>
+            <li>Click "Start Analysis" (automatically uses extension data)</li>
+          </ol>
+          <Typography variant="body2">
+            See <strong>MIGRATION_GUIDE.md</strong> for complete details.
+          </Typography>
+        </Alert>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
           <FormControlLabel
             label="Refresh media items"
